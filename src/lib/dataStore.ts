@@ -48,11 +48,27 @@ export function useGlowBookData() {
       const storedOrders = localStorage.getItem(LOCAL_ORDERS_KEY);
       const storedTx = localStorage.getItem(LOCAL_TX_KEY);
 
-      if (storedOrders) setOrders(JSON.parse(storedOrders));
-      else setOrders([]);
+      if (storedOrders) {
+        const parsed: Order[] = JSON.parse(storedOrders);
+        const filtered = Array.isArray(parsed) ? parsed.filter(o => !o.is_demo) : [];
+        setOrders(filtered);
+        if (Array.isArray(parsed) && filtered.length !== parsed.length) {
+          localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(filtered));
+        }
+      } else {
+        setOrders([]);
+      }
 
-      if (storedTx) setTransactions(JSON.parse(storedTx));
-      else setTransactions([]);
+      if (storedTx) {
+        const parsed: Transaction[] = JSON.parse(storedTx);
+        const filtered = Array.isArray(parsed) ? parsed.filter(t => !t.is_demo) : [];
+        setTransactions(filtered);
+        if (Array.isArray(parsed) && filtered.length !== parsed.length) {
+          localStorage.setItem(LOCAL_TX_KEY, JSON.stringify(filtered));
+        }
+      } else {
+        setTransactions([]);
+      }
     } catch (e) {
       console.error('Failed to parse local storage', e);
     }
@@ -298,32 +314,6 @@ export function useGlowBookData() {
     }
   };
 
-  // 8. Demo Data Management
-  const loadDemoData = async () => {
-    const res = await fetch('/api/demo', { method: 'POST' });
-    const data = await res.json();
-    if (isNeonConnected) {
-      await refreshData();
-    } else if (data.demoOrders && data.demoTransactions) {
-      setOrders(data.demoOrders);
-      setTransactions(data.demoTransactions);
-      saveToLocalStorage(data.demoOrders, data.demoTransactions);
-    }
-  };
-
-  const clearDemoData = async () => {
-    if (isNeonConnected) {
-      await fetch('/api/demo', { method: 'DELETE' });
-      await refreshData();
-    } else {
-      const remainingOrders = orders.filter(o => !o.is_demo);
-      const remainingTx = transactions.filter(t => !t.is_demo);
-      setOrders(remainingOrders);
-      setTransactions(remainingTx);
-      saveToLocalStorage(remainingOrders, remainingTx);
-    }
-  };
-
   return {
     orders,
     transactions,
@@ -338,8 +328,6 @@ export function useGlowBookData() {
     addTransaction,
     updateTransaction,
     deleteTransaction,
-    loadDemoData,
-    clearDemoData,
   };
 }
 

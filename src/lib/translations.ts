@@ -68,9 +68,6 @@ export const translations = {
     callNow: 'Call',
     whatsapp: 'WhatsApp',
     exportCsv: 'Export CSV',
-    demoData: 'Demo Data',
-    loadDemo: 'Load Demo Data',
-    clearDemo: 'Clear Demo Data',
     close: 'Close',
     viewDetails: 'View Details',
     
@@ -122,7 +119,6 @@ export const translations = {
     // System & Database status
     connectedDb: 'Cloud Sync Active',
     localMode: 'Device Storage Mode',
-    demoBadge: 'Demo Data',
     
     // Collect payment modal
     recordRemainingTitle: 'Record Balance Payment',
@@ -203,9 +199,6 @@ export const translations = {
     callNow: 'कॉल करें',
     whatsapp: 'व्हाट्सएप',
     exportCsv: 'CSV डाउनलोड करें',
-    demoData: 'डेमो डेटा',
-    loadDemo: 'डेमो डेटा भरें',
-    clearDemo: 'डेमो डेटा हटाएं',
     close: 'बंद करें',
     viewDetails: 'विवरण देखें',
     
@@ -257,7 +250,6 @@ export const translations = {
     // System & Database status
     connectedDb: 'क्लाउड सिंक एक्टिव',
     localMode: 'डिवाइस स्टोरेज मोड',
-    demoBadge: 'डेमो डेटा',
     
     // Collect payment modal
     recordRemainingTitle: 'बाकी रकम का भुगतान दर्ज करें',

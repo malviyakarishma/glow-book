@@ -431,20 +431,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   <div className="order-customer">
                     <div className="customer-name">
                       <span>{order.customer_name}</span>
-                      {order.is_demo && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            background: '#F3F4F6',
-                            color: '#6B7280',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          Demo
-                        </span>
-                      )}
                     </div>
                     <div className="service-title">{order.service_type}</div>
                   </div>

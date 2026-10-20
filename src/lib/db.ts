@@ -57,6 +57,10 @@ export async function ensureTablesExist(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(appointment_date);`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_order_id ON transactions(order_id);`;
 
+  // Ensure any previous demo records are cleaned up
+  await sql`DELETE FROM transactions WHERE is_demo = TRUE;`;
+  await sql`DELETE FROM orders WHERE is_demo = TRUE;`;
+
   isInitialized = true;
 }
 
@@ -102,6 +106,7 @@ export async function dbGetOrders(): Promise<Order[]> {
   const sql = getSql();
   const rows = await sql`
     SELECT * FROM orders 
+    WHERE is_demo IS NOT TRUE
     ORDER BY appointment_date ASC, created_at DESC;
   `;
   return rows.map(mapDbOrder);
@@ -179,6 +184,7 @@ export async function dbGetTransactions(): Promise<Transaction[]> {
   const sql = getSql();
   const rows = await sql`
     SELECT * FROM transactions 
+    WHERE is_demo IS NOT TRUE
     ORDER BY date DESC, created_at DESC;
   `;
   return rows.map(mapDbTx);

@@ -577,19 +577,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         Booking
                       </span>
                     )}
-                    {tx.is_demo && (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          background: '#F3F4F6',
-                          color: '#6B7280',
-                          padding: '1px 5px',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        Demo
-                      </span>
-                    )}
                   </span>
                 </div>
               </div>

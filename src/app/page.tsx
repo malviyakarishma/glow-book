@@ -51,8 +51,6 @@ export default function Home() {
     addTransaction,
     updateTransaction,
     deleteTransaction,
-    loadDemoData,
-    clearDemoData,
   } = useGlowBookData();
 
   // Toast message state
@@ -147,24 +145,12 @@ export default function Home() {
     showToast(t.savedSuccess);
   };
 
-  const hasDemo = orders.some(o => o.is_demo) || transactions.some(t => t.is_demo);
-
   return (
     <div className="app-container">
       {/* 1. Top Header with Desktop Navigation */}
       <Header
         lang={lang}
         onToggleLang={handleToggleLang}
-        isNeonConnected={isNeonConnected}
-        onLoadDemo={async () => {
-          await loadDemoData();
-          showToast(lang === 'hi' ? 'डेमो डेटा लोड हो गया' : 'Demo data loaded');
-        }}
-        onClearDemo={async () => {
-          await clearDemoData();
-          showToast(lang === 'hi' ? 'डेमो डेटा हटा दिया गया' : 'Demo data cleared');
-        }}
-        hasDemoData={hasDemo}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
       />

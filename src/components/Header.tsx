@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sparkles, Globe, MoreVertical, Trash2, FolderDown, LayoutDashboard, CalendarCheck, Receipt } from 'lucide-react';
+import React from 'react';
+import { Sparkles, Globe, LayoutDashboard, CalendarCheck, Receipt } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 
 interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
-  isNeonConnected: boolean;
-  onLoadDemo: () => void;
-  onClearDemo: () => void;
-  hasDemoData: boolean;
   activeTab?: 'dashboard' | 'transactions' | 'orders';
   onSelectTab?: (tab: 'dashboard' | 'transactions' | 'orders') => void;
 }
@@ -18,15 +14,10 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   lang,
   onToggleLang,
-  isNeonConnected,
-  onLoadDemo,
-  onClearDemo,
-  hasDemoData,
   activeTab = 'dashboard',
   onSelectTab,
 }) => {
   const t = translations[lang];
-  const [showMenu, setShowMenu] = useState(false);
 
   return (
     <header className="app-header">
@@ -85,80 +76,6 @@ export const Header: React.FC<HeaderProps> = ({
             <Globe size={15} />
             <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
           </button>
-
-          {/* Options / Demo Data Menu */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setShowMenu(!showMenu)}
-              className="icon-btn-ghost header-menu-btn"
-              title="Options & Data"
-              aria-label="More options"
-              aria-expanded={showMenu}
-            >
-              <MoreVertical size={18} />
-            </button>
-
-            {showMenu && (
-              <>
-                <div
-                  className="dropdown-backdrop"
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className="dropdown-menu">
-                  {/* Subtle status indicator */}
-                  <div
-                    style={{
-                      padding: '8px 12px',
-                      fontSize: '0.78rem',
-                      color: 'var(--text-muted)',
-                      borderBottom: '1px solid var(--rose-border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isNeonConnected ? '#10B981' : '#F59E0B',
-                        display: 'inline-block',
-                      }}
-                    />
-                    <span>{isNeonConnected ? t.connectedDb : t.localMode}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onLoadDemo();
-                      setShowMenu(false);
-                    }}
-                    className="dropdown-item"
-                  >
-                    <FolderDown size={16} color="var(--rose-primary)" />
-                    <span>{t.loadDemo}</span>
-                  </button>
-
-                  {hasDemoData && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClearDemo();
-                        setShowMenu(false);
-                      }}
-                      className="dropdown-item danger"
-                    >
-                      <Trash2 size={16} />
-                      <span>{t.clearDemo}</span>
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </header>
