@@ -13,6 +13,9 @@ import {
   CreditCard,
   Search,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import { Order, OrderStatus } from '@/lib/types';
 import { Language, translations } from '@/lib/translations';
@@ -40,18 +43,49 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const t = translations[lang];
 
   const [todayStr, setTodayStr] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
-    setTodayStr(new Date().toISOString().split('T')[0]);
+    const now = new Date().toISOString().split('T')[0];
+    setTodayStr(now);
+    setSelectedDate(now);
   }, []);
 
   const currentMonthStr = useMemo(() => (todayStr ? todayStr.substring(0, 7) : ''), [todayStr]);
   const currentYearStr = useMemo(() => (todayStr ? todayStr.substring(0, 4) : ''), [todayStr]);
 
-  // Filters
-  const [period, setPeriod] = useState<'all' | 'today' | 'month' | 'year'>('all');
+  // Filters: 'all' | 'today' | 'date' | 'month' | 'year'
+  const [period, setPeriod] = useState<'all' | 'today' | 'date' | 'month' | 'year'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Day navigation helper (-1 or +1 day)
+  const shiftSelectedDate = (days: number) => {
+    const base = selectedDate || todayStr;
+    if (!base) return;
+    const [y, m, d] = base.split('-').map(Number);
+    const nextDate = new Date(y, m - 1, d + days);
+    const nextStr = nextDate.toISOString().split('T')[0];
+    setSelectedDate(nextStr);
+    setPeriod('date');
+  };
+
+  // Helper to format date in readable form
+  const formatReadableDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Filtered list
   const filtered = useMemo(() => {
@@ -59,6 +93,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       .filter(o => {
         // Date filter
         if (period === 'today' && o.appointment_date !== todayStr) return false;
+        if (period === 'date' && o.appointment_date !== selectedDate) return false;
         if (period === 'month' && !o.appointment_date.startsWith(currentMonthStr)) return false;
         if (period === 'year' && !o.appointment_date.startsWith(currentYearStr)) return false;
 
@@ -77,7 +112,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         return true;
       })
       .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date));
-  }, [orders, period, statusFilter, searchQuery, todayStr, currentMonthStr, currentYearStr]);
+  }, [orders, period, selectedDate, statusFilter, searchQuery, todayStr, currentMonthStr, currentYearStr]);
 
   // Totals for the current filtered view
   const totalBookedValue = useMemo(() => filtered.reduce((a, c) => a + Number(c.total_price), 0), [filtered]);
@@ -159,6 +194,18 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => {
+            setPeriod('date');
+            if (!selectedDate && todayStr) setSelectedDate(todayStr);
+          }}
+          className={`filter-pill ${period === 'date' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'date'}
+        >
+          {t.filterPickDate}
+        </button>
+        <button
+          type="button"
           onClick={() => setPeriod('month')}
           className={`filter-pill ${period === 'month' ? 'active' : ''}`}
           role="tab"
@@ -176,6 +223,112 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           {t.filterYear}
         </button>
       </div>
+
+      {/* Calendar Day Picker Bar (When "Pick Date" is selected) */}
+      {period === 'date' && (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '14px',
+            border: '1.5px solid var(--rose-primary)',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--rose-primary)' }}>
+              📅 {t.selectedDate}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setPeriod('all')}
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                background: 'var(--bg-app)',
+              }}
+            >
+              <X size={14} />
+              <span>{lang === 'hi' ? 'सभी देखें' : 'Show All'}</span>
+            </button>
+          </div>
+
+          {/* Calendar Picker Control with Previous/Next Arrows */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(-1)}
+              className="icon-btn-ghost"
+              title="Previous Day"
+              aria-label="Previous Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => {
+                setSelectedDate(e.target.value);
+                setPeriod('date');
+              }}
+              className="form-input"
+              style={{
+                flex: 1,
+                minHeight: '44px',
+                padding: '8px 12px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                textAlign: 'center',
+              }}
+              aria-label="Pick specific date"
+            />
+
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(1)}
+              className="icon-btn-ghost"
+              title="Next Day"
+              aria-label="Next Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronRight size={20} />
+            </button>
+
+            {selectedDate !== todayStr && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate(todayStr);
+                  setPeriod('date');
+                }}
+                className="btn-contact"
+                style={{ minHeight: '44px', padding: '0 12px', fontSize: '0.85rem' }}
+              >
+                {t.filterToday}
+              </button>
+            )}
+          </div>
+
+          {/* Readable Date Display */}
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 600 }}>
+            {formatReadableDate(selectedDate)} •{' '}
+            <strong style={{ color: 'var(--text-main)' }}>
+              {filtered.length} {lang === 'hi' ? 'बुकिंग मिली' : 'bookings found'}
+            </strong>
+          </div>
+        </div>
+      )}
 
       {/* Mobile-Friendly Search and Status Bar */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -244,8 +397,16 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           <div className="empty-icon-wrap">
             <Calendar size={26} />
           </div>
-          <div className="empty-title">{t.noOrdersFound}</div>
-          <div className="empty-subtitle">{t.addFirstOrder}</div>
+          <div className="empty-title">
+            {period === 'date'
+              ? `${lang === 'hi' ? 'इस तारीख को कोई बुकिंग नहीं है' : 'No bookings for this date'}`
+              : t.noOrdersFound}
+          </div>
+          <div className="empty-subtitle">
+            {period === 'date'
+              ? `${formatReadableDate(selectedDate)}`
+              : t.addFirstOrder}
+          </div>
         </div>
       ) : (
         <div className="card-list">

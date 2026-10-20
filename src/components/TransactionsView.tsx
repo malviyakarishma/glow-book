@@ -9,6 +9,10 @@ import {
   Edit2,
   Trash2,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  X,
 } from 'lucide-react';
 import { Transaction, TransactionType } from '@/lib/types';
 import { Language, translations, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/lib/translations';
@@ -34,13 +38,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const t = translations[lang];
 
   const [todayStr, setTodayStr] = useState<string>('');
-  const [period, setPeriod] = useState<'today' | 'month' | 'year' | 'all' | 'custom'>('month');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [period, setPeriod] = useState<'today' | 'date' | 'month' | 'year' | 'all' | 'custom'>('month');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
 
   useEffect(() => {
     const now = new Date().toISOString().split('T')[0];
     setTodayStr(now);
+    setSelectedDate(now);
     setCustomStart(now);
     setCustomEnd(now);
   }, []);
@@ -51,11 +57,40 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Day navigation helper (-1 or +1 day)
+  const shiftSelectedDate = (days: number) => {
+    const base = selectedDate || todayStr;
+    if (!base) return;
+    const [y, m, d] = base.split('-').map(Number);
+    const nextDate = new Date(y, m - 1, d + days);
+    const nextStr = nextDate.toISOString().split('T')[0];
+    setSelectedDate(nextStr);
+    setPeriod('date');
+  };
+
+  // Helper to format date in readable form
+  const formatReadableDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Filtered transactions
   const filtered = useMemo(() => {
     return transactions.filter(tx => {
       // Date filter
       if (period === 'today' && tx.date !== todayStr) return false;
+      if (period === 'date' && tx.date !== selectedDate) return false;
       if (period === 'month' && !tx.date.startsWith(currentMonthStr)) return false;
       if (period === 'year' && !tx.date.startsWith(currentYearStr)) return false;
       if (period === 'custom') {
@@ -83,6 +118,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     transactions,
     period,
     todayStr,
+    selectedDate,
     currentMonthStr,
     currentYearStr,
     customStart,
@@ -92,7 +128,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     searchQuery,
   ]);
 
-  // Summaries
+  // Summaries for the selected day/period
   const totalIncome = useMemo(() => {
     return filtered
       .filter(t => t.type === 'income')
@@ -181,6 +217,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => {
+            setPeriod('date');
+            if (!selectedDate && todayStr) setSelectedDate(todayStr);
+          }}
+          className={`filter-pill ${period === 'date' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'date'}
+        >
+          {t.filterPickDate}
+        </button>
+        <button
+          type="button"
           onClick={() => setPeriod('month')}
           className={`filter-pill ${period === 'month' ? 'active' : ''}`}
           role="tab"
@@ -216,6 +264,112 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           {t.filterCustom}
         </button>
       </div>
+
+      {/* Calendar Day Picker Bar (When "Pick Date" is selected) */}
+      {period === 'date' && (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '14px',
+            border: '1.5px solid var(--rose-primary)',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--rose-primary)' }}>
+              📅 {t.selectedDate}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setPeriod('month')}
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                background: 'var(--bg-app)',
+              }}
+            >
+              <X size={14} />
+              <span>{lang === 'hi' ? 'महीने का देखें' : 'Show Month'}</span>
+            </button>
+          </div>
+
+          {/* Calendar Picker Control with Previous/Next Arrows */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(-1)}
+              className="icon-btn-ghost"
+              title="Previous Day"
+              aria-label="Previous Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => {
+                setSelectedDate(e.target.value);
+                setPeriod('date');
+              }}
+              className="form-input"
+              style={{
+                flex: 1,
+                minHeight: '44px',
+                padding: '8px 12px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                textAlign: 'center',
+              }}
+              aria-label="Pick specific date"
+            />
+
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(1)}
+              className="icon-btn-ghost"
+              title="Next Day"
+              aria-label="Next Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronRight size={20} />
+            </button>
+
+            {selectedDate !== todayStr && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate(todayStr);
+                  setPeriod('date');
+                }}
+                className="btn-contact"
+                style={{ minHeight: '44px', padding: '0 12px', fontSize: '0.85rem' }}
+              >
+                {t.filterToday}
+              </button>
+            )}
+          </div>
+
+          {/* Readable Date Display */}
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 600 }}>
+            {formatReadableDate(selectedDate)} •{' '}
+            <strong style={{ color: 'var(--text-main)' }}>
+              {filtered.length} {lang === 'hi' ? 'लेन-देन दर्ज' : 'transactions found'}
+            </strong>
+          </div>
+        </div>
+      )}
 
       {/* Custom Date Range Picker */}
       {period === 'custom' && (
@@ -253,7 +407,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </div>
       )}
 
-      {/* Totals Summary Cards */}
+      {/* Totals Summary Cards (Recalculated for the selected day or period) */}
       <div className="stats-container">
         <div className="stat-card income-card">
           <div className="stat-label">
@@ -384,8 +538,16 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           <div className="empty-icon-wrap">
             <Sparkles size={26} />
           </div>
-          <div className="empty-title">{t.noTransactionsFound}</div>
-          <div className="empty-subtitle">{t.addFirstTx}</div>
+          <div className="empty-title">
+            {period === 'date'
+              ? `${lang === 'hi' ? 'इस तारीख को कोई लेन-देन नहीं है' : 'No transactions for this date'}`
+              : t.noTransactionsFound}
+          </div>
+          <div className="empty-subtitle">
+            {period === 'date'
+              ? `${formatReadableDate(selectedDate)}`
+              : t.addFirstTx}
+          </div>
         </div>
       ) : (
         <div className="card-list">

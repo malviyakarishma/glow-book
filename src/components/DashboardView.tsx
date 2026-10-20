@@ -11,7 +11,9 @@ import {
   CreditCard,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
   Clock,
+  X,
 } from 'lucide-react';
 import { Order, Transaction } from '@/lib/types';
 import { Language, translations } from '@/lib/translations';
@@ -38,25 +40,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectTab,
 }) => {
   const t = translations[lang];
-  const [period, setPeriod] = useState<'today' | 'month' | 'year' | 'all'>('today');
+  const [period, setPeriod] = useState<'today' | 'date' | 'month' | 'year' | 'all'>('today');
   const [todayStr, setTodayStr] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
-    setTodayStr(new Date().toISOString().split('T')[0]);
+    const now = new Date().toISOString().split('T')[0];
+    setTodayStr(now);
+    setSelectedDate(now);
   }, []);
 
   const currentMonthStr = useMemo(() => (todayStr ? todayStr.substring(0, 7) : ''), [todayStr]);
   const currentYearStr = useMemo(() => (todayStr ? todayStr.substring(0, 4) : ''), [todayStr]);
 
+  // Day navigation helper (-1 or +1 day)
+  const shiftSelectedDate = (days: number) => {
+    const base = selectedDate || todayStr;
+    if (!base) return;
+    const [y, m, d] = base.split('-').map(Number);
+    const nextDate = new Date(y, m - 1, d + days);
+    const nextStr = nextDate.toISOString().split('T')[0];
+    setSelectedDate(nextStr);
+    setPeriod('date');
+  };
+
+  const formatReadableDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Filter transactions based on selected dashboard period
   const filteredTx = useMemo(() => {
     return transactions.filter(tx => {
       if (period === 'today') return tx.date === todayStr;
+      if (period === 'date') return tx.date === selectedDate;
       if (period === 'month') return tx.date.startsWith(currentMonthStr);
       if (period === 'year') return tx.date.startsWith(currentYearStr);
       return true;
     });
-  }, [transactions, period, todayStr, currentMonthStr, currentYearStr]);
+  }, [transactions, period, todayStr, selectedDate, currentMonthStr, currentYearStr]);
 
   // Financial Stats for selected period
   const totalIncome = useMemo(() => {
@@ -88,13 +121,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [transactions, orders, currentMonthStr]);
 
-  // Upcoming Orders (Upcoming status, sorted by appointment date)
-  const upcomingOrders = useMemo(() => {
+  // Relevant Orders for the view:
+  // If a specific date is selected, show orders of that day!
+  // Otherwise, show upcoming orders ordered by date.
+  const relevantOrders = useMemo(() => {
+    if (period === 'date') {
+      return orders.filter(o => o.appointment_date === selectedDate);
+    }
     return orders
       .filter(o => o.status === 'Upcoming')
       .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
       .slice(0, 5);
-  }, [orders]);
+  }, [orders, period, selectedDate]);
 
   const getDateLabel = (dateStr: string) => {
     if (dateStr === todayStr) return lang === 'hi' ? 'आज' : 'Today';
@@ -159,6 +197,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => {
+            setPeriod('date');
+            if (!selectedDate && todayStr) setSelectedDate(todayStr);
+          }}
+          className={`filter-pill ${period === 'date' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'date'}
+        >
+          {t.filterPickDate}
+        </button>
+        <button
+          type="button"
           onClick={() => setPeriod('month')}
           className={`filter-pill ${period === 'month' ? 'active' : ''}`}
           role="tab"
@@ -186,12 +236,115 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
+      {/* Calendar Day Picker Bar (When "Pick Date" is selected) */}
+      {period === 'date' && (
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '14px',
+            border: '1.5px solid var(--rose-primary)',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--rose-primary)' }}>
+              📅 {t.selectedDate}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setPeriod('today')}
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                background: 'var(--bg-app)',
+              }}
+            >
+              <X size={14} />
+              <span>{lang === 'hi' ? 'आज का देखें' : "Show Today"}</span>
+            </button>
+          </div>
+
+          {/* Calendar Picker Control with Previous/Next Arrows */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(-1)}
+              className="icon-btn-ghost"
+              title="Previous Day"
+              aria-label="Previous Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => {
+                setSelectedDate(e.target.value);
+                setPeriod('date');
+              }}
+              className="form-input"
+              style={{
+                flex: 1,
+                minHeight: '44px',
+                padding: '8px 12px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                textAlign: 'center',
+              }}
+              aria-label="Pick specific date"
+            />
+
+            <button
+              type="button"
+              onClick={() => shiftSelectedDate(1)}
+              className="icon-btn-ghost"
+              title="Next Day"
+              aria-label="Next Day"
+              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
+            >
+              <ChevronRight size={20} />
+            </button>
+
+            {selectedDate !== todayStr && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate(todayStr);
+                  setPeriod('date');
+                }}
+                className="btn-contact"
+                style={{ minHeight: '44px', padding: '0 12px', fontSize: '0.85rem' }}
+              >
+                {t.filterToday}
+              </button>
+            )}
+          </div>
+
+          {/* Readable Date Display */}
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 600 }}>
+            {formatReadableDate(selectedDate)}
+          </div>
+        </div>
+      )}
+
       {/* 3. Core Stats Cards */}
       <div className="stats-container">
         <div className="stat-card income-card">
           <div className="stat-label">
             <ArrowDownRight size={15} color="var(--income-text)" />
-            <span>{t.totalIncome}</span>
+            <span>{period === 'date' ? `${formatReadableDate(selectedDate)} ${t.totalIncome}` : t.totalIncome}</span>
           </div>
           <div className="stat-value income">₹ {totalIncome.toLocaleString('en-IN')}</div>
         </div>
@@ -227,12 +380,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 5. Upcoming Appointments Section */}
+      {/* 5. Appointments Section (For the selected day or upcoming) */}
       <div>
         <div className="section-header">
           <h2 className="section-title">
             <Calendar size={19} color="var(--rose-primary)" />
-            <span>{t.upcomingOrders} ({upcomingOrders.length})</span>
+            <span>
+              {period === 'date'
+                ? `${formatReadableDate(selectedDate)} (${relevantOrders.length})`
+                : `${t.upcomingOrders} (${relevantOrders.length})`}
+            </span>
           </h2>
           <button
             type="button"
@@ -244,17 +401,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
 
-        {upcomingOrders.length === 0 ? (
+        {relevantOrders.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon-wrap">
               <Calendar size={26} />
             </div>
-            <div className="empty-title">{t.noUpcomingToday}</div>
-            <div className="empty-subtitle">{t.addFirstOrder}</div>
+            <div className="empty-title">
+              {period === 'date'
+                ? lang === 'hi'
+                  ? 'इस तारीख को कोई बुकिंग नहीं है'
+                  : 'No bookings for this date'
+                : t.noUpcomingToday}
+            </div>
+            <div className="empty-subtitle">
+              {period === 'date' ? formatReadableDate(selectedDate) : t.addFirstOrder}
+            </div>
           </div>
         ) : (
           <div className="card-list" style={{ marginTop: '8px' }}>
-            {upcomingOrders.map(order => {
+            {relevantOrders.map(order => {
               const isTodayOrTomorrow =
                 order.appointment_date === todayStr ||
                 order.appointment_date === new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -381,7 +546,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h2 className="section-title">
             <ArrowDownRight size={19} color="var(--income-text)" />
             <span>
-              {period === 'today' ? t.todayIncome : t.totalIncome} / {t.totalExpense}
+              {period === 'date'
+                ? `${formatReadableDate(selectedDate)} (${filteredTx.length})`
+                : period === 'today'
+                ? t.todayIncome
+                : t.totalIncome}
             </span>
           </h2>
           <button
@@ -400,7 +569,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Sparkles size={26} />
             </div>
             <div className="empty-title">{t.noTransactionsFound}</div>
-            <div className="empty-subtitle">{t.addFirstTx}</div>
+            <div className="empty-subtitle">
+              {period === 'date' ? formatReadableDate(selectedDate) : t.addFirstTx}
+            </div>
           </div>
         ) : (
           <div className="card-list" style={{ marginTop: '8px' }}>
