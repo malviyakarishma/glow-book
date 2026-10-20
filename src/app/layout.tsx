@@ -6,6 +6,14 @@ export const metadata: Metadata = {
   description: "A calm, simple, and mobile-friendly web app for beauticians to manage customer orders, appointments, daily income, and expenses.",
   keywords: ["beautician", "salon cash book", "appointment manager", "makeup artist", "income expense tracker"],
   authors: [{ name: "GlowBook" }],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "GlowBook",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
@@ -13,7 +21,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#FAF6F7",
+  viewportFit: "cover",
+  themeColor: "#FAF7F8",
 };
 
 export default function RootLayout({

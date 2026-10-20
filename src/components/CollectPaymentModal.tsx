@@ -156,6 +156,7 @@ export const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({
               <div style={{ position: 'relative' }}>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="any"
                   min="1"
                   required

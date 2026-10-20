@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, Globe, Database, HardDrive, MoreVertical, Trash2, FolderDown } from 'lucide-react';
+import { Sparkles, Globe, MoreVertical, Trash2, FolderDown, LayoutDashboard, CalendarCheck, Receipt } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 
 interface HeaderProps {
@@ -11,6 +11,8 @@ interface HeaderProps {
   onLoadDemo: () => void;
   onClearDemo: () => void;
   hasDemoData: boolean;
+  activeTab?: 'dashboard' | 'transactions' | 'orders';
+  onSelectTab?: (tab: 'dashboard' | 'transactions' | 'orders') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,132 +22,143 @@ export const Header: React.FC<HeaderProps> = ({
   onLoadDemo,
   onClearDemo,
   hasDemoData,
+  activeTab = 'dashboard',
+  onSelectTab,
 }) => {
   const t = translations[lang];
   const [showMenu, setShowMenu] = useState(false);
 
   return (
     <header className="app-header">
-      <div className="brand-wrapper">
-        <div className="brand-icon">
-          <Sparkles size={22} strokeWidth={2.4} />
-        </div>
-        <div>
-          <div className="brand-title">
-            <span>{t.appName}</span>
+      <div className="header-inner">
+        {/* Brand */}
+        <div className="brand-wrapper">
+          <div className="brand-icon" aria-hidden="true">
+            <Sparkles size={20} strokeWidth={2.4} />
           </div>
-          <div className="brand-tagline">{t.appTagline}</div>
-        </div>
-      </div>
-
-      <div className="header-actions">
-        {/* Language Switcher */}
-        <button
-          onClick={onToggleLang}
-          className="lang-btn"
-          title="Toggle Language / भाषा बदलें"
-          aria-label="Toggle Language"
-        >
-          <Globe size={16} />
-          <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
-        </button>
-
-        {/* Database Status Indicator */}
-        <div
-          className={`db-pill ${isNeonConnected ? 'neon' : 'local'}`}
-          title={isNeonConnected ? t.connectedNeon : t.localMode}
-        >
-          {isNeonConnected ? (
-            <>
-              <Database size={13} />
-              <span>Neon</span>
-            </>
-          ) : (
-            <>
-              <HardDrive size={13} />
-              <span>Offline/Local</span>
-            </>
-          )}
+          <div className="brand-text">
+            <h1 className="brand-title">{t.appName}</h1>
+            <p className="brand-tagline">{t.appTagline}</p>
+          </div>
         </div>
 
-        {/* Demo Data Menu */}
-        <div style={{ position: 'relative' }}>
+        {/* Desktop Navigation Links (Visible on >= 768px) */}
+        {onSelectTab && (
+          <nav className="desktop-nav" aria-label="Desktop Navigation">
+            <button
+              type="button"
+              onClick={() => onSelectTab('dashboard')}
+              className={`desktop-nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+            >
+              <LayoutDashboard size={17} />
+              <span>{t.dashboard}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('orders')}
+              className={`desktop-nav-link ${activeTab === 'orders' ? 'active' : ''}`}
+            >
+              <CalendarCheck size={17} />
+              <span>{t.orders}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('transactions')}
+              className={`desktop-nav-link ${activeTab === 'transactions' ? 'active' : ''}`}
+            >
+              <Receipt size={17} />
+              <span>{t.incomeExpense}</span>
+            </button>
+          </nav>
+        )}
+
+        {/* Header Actions */}
+        <div className="header-actions">
+          {/* Language Switcher */}
           <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="icon-btn-ghost"
-            title="Options & Demo Data"
-            aria-label="More options"
+            type="button"
+            onClick={onToggleLang}
+            className="lang-btn"
+            title="Toggle Language / भाषा बदलें"
+            aria-label={`Switch to ${lang === 'en' ? 'Hindi' : 'English'}`}
           >
-            <MoreVertical size={18} />
+            <Globe size={15} />
+            <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
           </button>
 
-          {showMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: '46px',
-                background: 'white',
-                borderRadius: '14px',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-                border: '1.5px solid var(--rose-border)',
-                minWidth: '200px',
-                zIndex: 50,
-                overflow: 'hidden',
-                padding: '6px',
-              }}
+          {/* Options / Demo Data Menu */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowMenu(!showMenu)}
+              className="icon-btn-ghost header-menu-btn"
+              title="Options & Data"
+              aria-label="More options"
+              aria-expanded={showMenu}
             >
-              <button
-                onClick={() => {
-                  onLoadDemo();
-                  setShowMenu(false);
-                }}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  color: 'var(--text-main)',
-                  textAlign: 'left',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-rose-tint)')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-              >
-                <FolderDown size={16} color="var(--rose-primary)" />
-                {t.loadDemo}
-              </button>
+              <MoreVertical size={18} />
+            </button>
 
-              {hasDemoData && (
-                <button
-                  onClick={() => {
-                    onClearDemo();
-                    setShowMenu(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    color: '#DC2626',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FEE2E2')}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Trash2 size={16} />
-                  {t.clearDemo}
-                </button>
-              )}
-            </div>
-          )}
+            {showMenu && (
+              <>
+                <div
+                  className="dropdown-backdrop"
+                  onClick={() => setShowMenu(false)}
+                />
+                <div className="dropdown-menu">
+                  {/* Subtle status indicator */}
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: '0.78rem',
+                      color: 'var(--text-muted)',
+                      borderBottom: '1px solid var(--rose-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '7px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isNeonConnected ? '#10B981' : '#F59E0B',
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span>{isNeonConnected ? t.connectedDb : t.localMode}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLoadDemo();
+                      setShowMenu(false);
+                    }}
+                    className="dropdown-item"
+                  >
+                    <FolderDown size={16} color="var(--rose-primary)" />
+                    <span>{t.loadDemo}</span>
+                  </button>
+
+                  {hasDemoData && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClearDemo();
+                        setShowMenu(false);
+                      }}
+                      className="dropdown-item danger"
+                    >
+                      <Trash2 size={16} />
+                      <span>{t.clearDemo}</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </header>

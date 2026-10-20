@@ -49,7 +49,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     setErrorMsg('');
   }, [initialData, defaultType, isOpen]);
 
-  // When type changes, adjust default category if current category isn't in that type
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
     if (newType === 'income') {
@@ -100,7 +99,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
-  // Category label helper for bilingual display
   const getCatLabel = (cat: string) => {
     switch (cat) {
       case 'Bridal Makeup': return t.catBridalMakeup;
@@ -120,14 +118,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-header">
           <h3 className="modal-title">
             {initialData
               ? lang === 'hi' ? 'एंट्री बदलें' : 'Edit Entry'
               : type === 'income' ? t.addIncome : t.addExpense}
           </h3>
-          <button onClick={onClose} className="icon-btn-ghost" aria-label="Close modal">
+          <button type="button" onClick={onClose} className="icon-btn-ghost" aria-label="Close modal">
             <X size={20} />
           </button>
         </div>
@@ -159,11 +157,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
             )}
 
-            {/* Amount with rupee symbol */}
+            {/* Amount with iOS decimal keypad */}
             <div className="form-group">
               <label className="form-label">{t.amount}</label>
               <input
                 type="number"
+                inputMode="decimal"
                 step="any"
                 min="1"
                 required
@@ -171,25 +170,29 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 className="form-input"
-                style={{ fontSize: '1.3rem', fontWeight: 700 }}
+                style={{ fontSize: '1.25rem', fontWeight: 800 }}
                 autoFocus
               />
 
-              {/* Quick amount chips for quick entry */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {/* Quick amount chips with 44px min-height */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                 {[500, 1000, 2000, 5000].map(val => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setAmount(String(val))}
                     style={{
-                      padding: '6px 12px',
+                      padding: '8px 14px',
+                      minHeight: '44px',
                       borderRadius: '8px',
                       background: 'var(--bg-card-subtle)',
                       border: '1px solid var(--rose-border)',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
                       color: 'var(--text-main)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
                     + ₹{val.toLocaleString('en-IN')}
@@ -232,7 +235,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <label className="form-label">{t.optionalNote}</label>
               <input
                 type="text"
-                placeholder={lang === 'hi' ? 'उदा. फाउंडेशन, दुल्हन का एडवांस...' : 'e.g. Foundation kit, lipstick...'}
+                placeholder={lang === 'hi' ? 'उदा. फाउंडेशन, लिपस्टिक, यात्रा...' : 'e.g. Foundation kit, travel fare...'}
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 className="form-input"
@@ -242,7 +245,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             {errorMsg && (
               <div
                 style={{
-                  padding: '10px 14px',
+                  padding: '12px 14px',
                   borderRadius: '10px',
                   background: '#FEE2E2',
                   border: '1px solid #FCA5A5',

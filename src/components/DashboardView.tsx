@@ -12,7 +12,6 @@ import {
   Sparkles,
   ChevronRight,
   Clock,
-  CheckCircle,
 } from 'lucide-react';
 import { Order, Transaction } from '@/lib/types';
 import { Language, translations } from '@/lib/translations';
@@ -46,8 +45,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setTodayStr(new Date().toISOString().split('T')[0]);
   }, []);
 
-  const currentMonthStr = useMemo(() => todayStr ? todayStr.substring(0, 7) : '', [todayStr]);
-  const currentYearStr = useMemo(() => todayStr ? todayStr.substring(0, 4) : '', [todayStr]);
+  const currentMonthStr = useMemo(() => (todayStr ? todayStr.substring(0, 7) : ''), [todayStr]);
+  const currentYearStr = useMemo(() => (todayStr ? todayStr.substring(0, 4) : ''), [todayStr]);
 
   // Filter transactions based on selected dashboard period
   const filteredTx = useMemo(() => {
@@ -94,10 +93,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return orders
       .filter(o => o.status === 'Upcoming')
       .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
-      .slice(0, 5); // Show top 5 upcoming
+      .slice(0, 5);
   }, [orders]);
 
-  // Date badge helper ("Today", "Tomorrow", or date)
   const getDateLabel = (dateStr: string) => {
     if (dateStr === todayStr) return lang === 'hi' ? 'आज' : 'Today';
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -107,53 +105,82 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="main-content">
-      {/* 1. Quick Actions Row (Large, Touch-Friendly Buttons) */}
-      <div className="action-grid">
-        <button onClick={onOpenAddOrder} className="action-card-btn primary-rose">
-          <div className="action-icon-circle">
-            <Plus size={24} strokeWidth={2.6} />
+      {/* 1. Ergonomic Action Buttons (Hero New Booking + Side-by-Side Income/Expense) */}
+      <div className="action-section">
+        <button
+          type="button"
+          onClick={onOpenAddOrder}
+          className="hero-action-btn"
+          aria-label={t.addOrder}
+        >
+          <div className="hero-btn-left">
+            <div className="hero-btn-icon">
+              <Plus size={22} strokeWidth={2.6} />
+            </div>
+            <div className="hero-btn-text">
+              <h3>{t.addOrder}</h3>
+              <p>{lang === 'hi' ? 'नई ग्राहक बुकिंग व एडवांस दर्ज करें' : 'Schedule appointment & record advance'}</p>
+            </div>
           </div>
-          <span>{t.addOrder}</span>
+          <ChevronRight size={20} style={{ opacity: 0.8 }} />
         </button>
 
-        <button onClick={onOpenAddIncome} className="action-card-btn income-btn">
-          <div className="action-icon-circle">
-            <ArrowDownRight size={24} strokeWidth={2.4} />
-          </div>
-          <span>{t.addIncome}</span>
-        </button>
+        <div className="sub-action-grid">
+          <button
+            type="button"
+            onClick={onOpenAddIncome}
+            className="sub-action-btn income-btn"
+          >
+            <ArrowDownRight size={20} strokeWidth={2.4} />
+            <span>{t.addIncome}</span>
+          </button>
 
-        <button onClick={onOpenAddExpense} className="action-card-btn expense-btn">
-          <div className="action-icon-circle">
-            <ArrowUpRight size={24} strokeWidth={2.4} />
-          </div>
-          <span>{t.addExpense}</span>
-        </button>
+          <button
+            type="button"
+            onClick={onOpenAddExpense}
+            className="sub-action-btn expense-btn"
+          >
+            <ArrowUpRight size={20} strokeWidth={2.4} />
+            <span>{t.addExpense}</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Date Filter Pills */}
-      <div className="filter-pill-bar">
+      <div className="filter-pill-bar" role="tablist" aria-label="Date range filters">
         <button
+          type="button"
           onClick={() => setPeriod('today')}
           className={`filter-pill ${period === 'today' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'today'}
         >
           {t.filterToday}
         </button>
         <button
+          type="button"
           onClick={() => setPeriod('month')}
           className={`filter-pill ${period === 'month' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'month'}
         >
           {t.filterMonth}
         </button>
         <button
+          type="button"
           onClick={() => setPeriod('year')}
           className={`filter-pill ${period === 'year' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'year'}
         >
           {t.filterYear}
         </button>
         <button
+          type="button"
           onClick={() => setPeriod('all')}
           className={`filter-pill ${period === 'all' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={period === 'all'}
         >
           {t.filterAll}
         </button>
@@ -163,7 +190,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="stats-container">
         <div className="stat-card income-card">
           <div className="stat-label">
-            <ArrowDownRight size={16} color="var(--income-text)" />
+            <ArrowDownRight size={15} color="var(--income-text)" />
             <span>{t.totalIncome}</span>
           </div>
           <div className="stat-value income">₹ {totalIncome.toLocaleString('en-IN')}</div>
@@ -171,7 +198,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="stat-card expense-card">
           <div className="stat-label">
-            <ArrowUpRight size={16} color="var(--expense-text)" />
+            <ArrowUpRight size={15} color="var(--expense-text)" />
             <span>{t.totalExpense}</span>
           </div>
           <div className="stat-value expense">₹ {totalExpense.toLocaleString('en-IN')}</div>
@@ -179,7 +206,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="stat-card profit-card">
           <div className="stat-label">
-            <Sparkles size={16} color="var(--rose-primary)" />
+            <Sparkles size={15} color="var(--rose-primary)" />
             <span>{t.netProfit}</span>
           </div>
           <div className="stat-value profit">₹ {netProfit.toLocaleString('en-IN')}</div>
@@ -190,10 +217,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="highlight-banner">
         <div className="banner-content">
           <h4>{t.monthIncome}</h4>
-          <p>{t.pendingBalance}: <strong style={{ color: '#C2410C' }}>₹ {monthStats.pendingDue.toLocaleString('en-IN')}</strong></p>
+          <p>
+            {t.pendingBalance}: <strong style={{ color: 'var(--pending-text)' }}>₹ {monthStats.pendingDue.toLocaleString('en-IN')}</strong>
+          </p>
         </div>
         <div className="banner-badge">
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t.monthProfit}</div>
+          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t.monthProfit}</div>
           <div className="badge-val">₹ {monthStats.profit.toLocaleString('en-IN')}</div>
         </div>
       </div>
@@ -201,14 +230,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 5. Upcoming Appointments Section */}
       <div>
         <div className="section-header">
-          <h3 className="section-title">
-            <Calendar size={20} color="var(--rose-primary)" />
+          <h2 className="section-title">
+            <Calendar size={19} color="var(--rose-primary)" />
             <span>{t.upcomingOrders} ({upcomingOrders.length})</span>
-          </h3>
+          </h2>
           <button
+            type="button"
             onClick={() => onSelectTab('orders')}
             className="section-action"
-            style={{ display: 'flex', alignItems: 'center', gap: '3px' }}
           >
             <span>{lang === 'hi' ? 'सभी देखें' : 'View all'}</span>
             <ChevronRight size={16} />
@@ -218,13 +247,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {upcomingOrders.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon-wrap">
-              <Calendar size={28} />
+              <Calendar size={26} />
             </div>
             <div className="empty-title">{t.noUpcomingToday}</div>
             <div className="empty-subtitle">{t.addFirstOrder}</div>
           </div>
         ) : (
-          <div className="card-list" style={{ marginTop: '10px' }}>
+          <div className="card-list" style={{ marginTop: '8px' }}>
             {upcomingOrders.map(order => {
               const isTodayOrTomorrow =
                 order.appointment_date === todayStr ||
@@ -236,8 +265,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="order-card"
                   style={{
                     borderLeft: isTodayOrTomorrow
-                      ? '5px solid var(--rose-primary)'
-                      : '1.5px solid var(--rose-border-subtle)',
+                      ? '4px solid var(--rose-primary)'
+                      : '1px solid var(--rose-border)',
                   }}
                 >
                   <div className="order-card-top">
@@ -247,7 +276,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {order.is_demo && (
                           <span
                             style={{
-                              fontSize: '0.7rem',
+                              fontSize: '0.68rem',
                               fontWeight: 700,
                               background: '#F3F4F6',
                               color: '#6B7280',
@@ -263,7 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
 
                     <div className="appointment-badge">
-                      <Clock size={13} />
+                      <Clock size={12} />
                       <span>
                         {getDateLabel(order.appointment_date)}
                         {order.appointment_time ? ` • ${order.appointment_time}` : ''}
@@ -271,7 +300,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Financial snapshot */}
+                  {/* Financial Snapshot */}
                   <div className="order-money-grid">
                     <div className="money-box">
                       <span className="money-label">{t.totalPrice}</span>
@@ -285,7 +314,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className="money-label">{t.balanceDue}</span>
                       <span
                         className="money-amount due"
-                        style={{ color: order.remaining_balance > 0 ? '#C2410C' : '#047857' }}
+                        style={{ color: order.remaining_balance > 0 ? 'var(--pending-text)' : 'var(--income-text)' }}
                       >
                         ₹{order.remaining_balance.toLocaleString('en-IN')}
                       </span>
@@ -293,7 +322,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
 
                   {order.notes && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       "{order.notes}"
                     </div>
                   )}
@@ -302,10 +331,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="order-actions">
                     {order.remaining_balance > 0 && (
                       <button
+                        type="button"
                         onClick={() => onCollectPayment(order)}
                         className="btn-collect-payment"
                       >
-                        <CreditCard size={16} />
+                        <CreditCard size={15} />
                         <span>{t.collectPayment} (₹{order.remaining_balance.toLocaleString('en-IN')})</span>
                       </button>
                     )}
@@ -345,19 +375,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* 6. Today's Transactions Quick Preview */}
+      {/* 6. Transactions Quick Preview */}
       <div>
         <div className="section-header">
-          <h3 className="section-title">
-            <ArrowDownRight size={20} color="var(--income-text)" />
+          <h2 className="section-title">
+            <ArrowDownRight size={19} color="var(--income-text)" />
             <span>
               {period === 'today' ? t.todayIncome : t.totalIncome} / {t.totalExpense}
             </span>
-          </h3>
+          </h2>
           <button
+            type="button"
             onClick={() => onSelectTab('transactions')}
             className="section-action"
-            style={{ display: 'flex', alignItems: 'center', gap: '3px' }}
           >
             <span>{lang === 'hi' ? 'सभी देखें' : 'View all'}</span>
             <ChevronRight size={16} />
@@ -367,18 +397,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {filteredTx.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon-wrap">
-              <Sparkles size={28} />
+              <Sparkles size={26} />
             </div>
             <div className="empty-title">{t.noTransactionsFound}</div>
             <div className="empty-subtitle">{t.addFirstTx}</div>
           </div>
         ) : (
-          <div className="card-list" style={{ marginTop: '10px' }}>
+          <div className="card-list" style={{ marginTop: '8px' }}>
             {filteredTx.slice(0, 4).map(tx => (
               <div key={tx.id} className="tx-card">
                 <div className="tx-card-left">
                   <div className={`tx-icon-circle ${tx.type}`}>
-                    {tx.type === 'income' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
+                    {tx.type === 'income' ? <ArrowDownRight size={19} /> : <ArrowUpRight size={19} />}
                   </div>
                   <div className="tx-info">
                     <span className="tx-category">{tx.category}</span>

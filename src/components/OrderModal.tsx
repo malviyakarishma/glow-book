@@ -166,6 +166,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               <label className="form-label">{t.phoneNumber}</label>
               <input
                 type="tel"
+                inputMode="tel"
                 placeholder="9876543210"
                 value={phoneNumber}
                 onChange={e => setPhoneNumber(e.target.value)}
@@ -231,6 +232,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                 <label className="form-label">{t.totalPrice} *</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="any"
                   required
@@ -246,6 +248,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                 <label className="form-label">{t.advanceAmount}</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="any"
                   placeholder="₹ 0"

@@ -117,8 +117,8 @@ export const translations = {
     advanceReceivedBadge: 'Advance Paid',
     
     // System & Database status
-    connectedNeon: 'Connected to Neon PostgreSQL',
-    localMode: 'Local Storage Mode (Add DATABASE_URL to sync with Neon)',
+    connectedDb: 'Cloud Sync Active',
+    localMode: 'Device Storage Mode',
     demoBadge: 'Demo Data',
     
     // Collect payment modal
@@ -249,8 +249,8 @@ export const translations = {
     advanceReceivedBadge: 'एडवांस मिला',
     
     // System & Database status
-    connectedNeon: 'नियॉन डेटाबेस (Neon PostgreSQL) से कनेक्टेड',
-    localMode: 'लोकल स्टोरेज मोड (Neon से जोड़ने के लिए DATABASE_URL डालें)',
+    connectedDb: 'क्लाउड सिंक एक्टिव',
+    localMode: 'डिवाइस स्टोरेज मोड',
     demoBadge: 'डेमो डेटा',
     
     // Collect payment modal

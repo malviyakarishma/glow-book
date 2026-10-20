@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Receipt, CalendarCheck, Sparkles, Check, Database, Info } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 import { useGlowBookData } from '@/lib/dataStore';
 import { Language, translations } from '@/lib/translations';
 import { Order, Transaction, TransactionType, OrderStatus } from '@/lib/types';
 
 import { Header } from '@/components/Header';
+import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { TransactionsView } from '@/components/TransactionsView';
 import { OrdersView } from '@/components/OrdersView';
@@ -17,7 +18,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 
 export default function Home() {
   // Language State
-  const [lang, setLang] = useState<Language>('hi'); // Default to Hindi for mother's ease of use, with one-tap toggle!
+  const [lang, setLang] = useState<Language>('hi');
 
   useEffect(() => {
     const savedLang = localStorage.getItem('glowbook_lang');
@@ -34,7 +35,7 @@ export default function Home() {
 
   const t = translations[lang];
 
-  // Active View Tab
+  // Active View Tab ('dashboard' | 'transactions' | 'orders')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'orders'>('dashboard');
 
   // Backend / Persistent Data Hook
@@ -150,7 +151,7 @@ export default function Home() {
 
   return (
     <div className="app-container">
-      {/* 1. Header */}
+      {/* 1. Top Header with Desktop Navigation */}
       <Header
         lang={lang}
         onToggleLang={handleToggleLang}
@@ -164,6 +165,8 @@ export default function Home() {
           showToast(lang === 'hi' ? 'डेमो डेटा हटा दिया गया' : 'Demo data cleared');
         }}
         hasDemoData={hasDemo}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
       />
 
       {/* Database Setup Banner (Visible when DATABASE_URL is not yet connected) */}
@@ -174,57 +177,30 @@ export default function Home() {
             padding: '10px 14px',
             borderRadius: '12px',
             background: '#FEF3C7',
-            border: '1.5px solid #FDE68A',
+            border: '1px solid #FCD9BD',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            fontSize: '0.85rem',
-            color: '#92400E',
+            fontSize: '0.84rem',
+            color: '#963E09',
           }}
         >
           <Info size={18} style={{ flexShrink: 0 }} />
           <div>
-            <strong>{lang === 'hi' ? 'लोकल स्टोरेज मोड:' : 'Local Storage Mode:'}</strong>{' '}
+            <strong>{lang === 'hi' ? 'डिवाइस स्टोरेज मोड:' : 'Device Storage Mode:'}</strong>{' '}
             {lang === 'hi'
-              ? 'डेटा सुरक्षित सेव हो रहा है। Neon PostgreSQL से सिंक करने के लिए .env.local या Vercel में DATABASE_URL जोड़ें।'
-              : 'Data is safely stored locally. Add DATABASE_URL to connect with Neon PostgreSQL.'}
+              ? 'आपका डेटा सुरक्षित सेव हो रहा है।'
+              : 'Your data is being saved safely on this device.'}
           </div>
         </div>
       )}
 
-      {/* 2. Top Navigation Tabs */}
-      <nav className="nav-tabs" aria-label="Main Navigation">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-        >
-          <LayoutDashboard size={18} />
-          <span>{t.dashboard}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('transactions')}
-          className={`tab-btn ${activeTab === 'transactions' ? 'active' : ''}`}
-        >
-          <Receipt size={18} />
-          <span>{t.incomeExpense}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
-        >
-          <CalendarCheck size={18} />
-          <span>{t.orders}</span>
-        </button>
-      </nav>
-
-      {/* 3. Toast Notification */}
+      {/* 2. Toast Notification */}
       {toastMsg && (
         <div
           style={{
             position: 'fixed',
-            top: '80px',
+            top: 'calc(70px + env(safe-area-inset-top, 0px))',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 110,
@@ -232,13 +208,12 @@ export default function Home() {
             color: 'white',
             padding: '10px 20px',
             borderRadius: '30px',
-            fontSize: '0.92rem',
+            fontSize: '0.9rem',
             fontWeight: 700,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            animation: 'fadeIn 0.2s ease',
           }}
         >
           <Check size={16} color="#34D399" />
@@ -246,8 +221,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* 4. Active Tab Content */}
-      <main>
+      {/* 3. Main Views */}
+      <main style={{ flex: 1 }}>
         {activeTab === 'dashboard' && (
           <DashboardView
             orders={orders}
@@ -284,6 +259,13 @@ export default function Home() {
           />
         )}
       </main>
+
+      {/* 4. Mobile Bottom Navigation (Native iOS feel with safe area insets) */}
+      <BottomNav
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        lang={lang}
+      />
 
       {/* 5. Modals */}
       <TransactionModal
