@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Order, Transaction, SummaryStats } from './types';
+import { Order, Transaction } from './types';
+import { localToday } from './dates';
 
 const LOCAL_ORDERS_KEY = 'glowbook_local_orders';
 const LOCAL_TX_KEY = 'glowbook_local_transactions';
@@ -88,6 +89,44 @@ export function useGlowBookData() {
     refreshData();
   }, [refreshData]);
 
+  const newId = (prefix: string) =>
+    `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const createLocalOrder = (
+    orderData: Omit<Order, 'id' | 'created_at' | 'updated_at'>,
+    existingOrders: Order[],
+    existingTx: Transaction[]
+  ): { orders: Order[]; transactions: Transaction[] } => {
+    const orderId = newId('ord');
+    const newOrder: Order = {
+      ...orderData,
+      id: orderId,
+      remaining_balance: Math.max(0, orderData.total_price - orderData.advance_amount),
+      created_at: new Date().toISOString(),
+    };
+
+    let updatedTx = existingTx;
+    if (orderData.advance_amount > 0) {
+      const advanceTx: Transaction = {
+        id: newId('tx_adv'),
+        type: 'income',
+        amount: orderData.advance_amount,
+        category: orderData.service_type,
+        date: orderData.appointment_date,
+        note: `Advance payment for booking: ${orderData.customer_name}`,
+        order_id: orderId,
+        is_demo: orderData.is_demo,
+        created_at: new Date().toISOString(),
+      };
+      updatedTx = [advanceTx, ...updatedTx];
+    }
+
+    return {
+      orders: [newOrder, ...existingOrders],
+      transactions: updatedTx,
+    };
+  };
+
   // 1. Add Order
   const addOrder = async (orderData: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => {
     if (isNeonConnected) {
@@ -102,38 +141,41 @@ export function useGlowBookData() {
       }
       await refreshData();
     } else {
-      // Local Mode
-      const orderId = 'ord_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-      const newOrder: Order = {
-        ...orderData,
-        id: orderId,
-        remaining_balance: Math.max(0, orderData.total_price - orderData.advance_amount),
-        created_at: new Date().toISOString(),
-      };
+      const next = createLocalOrder(orderData, orders, transactions);
+      setOrders(next.orders);
+      setTransactions(next.transactions);
+      saveToLocalStorage(next.orders, next.transactions);
+    }
+  };
 
-      const updatedOrders = [newOrder, ...orders];
-      let updatedTx = [...transactions];
+  // 1b. Add many orders (multi-date / multi-time booking)
+  const addOrders = async (ordersData: Omit<Order, 'id' | 'created_at' | 'updated_at'>[]) => {
+    if (!ordersData.length) return;
 
-      // Auto-add advance income transaction if advance was paid
-      if (orderData.advance_amount > 0) {
-        const txId = 'tx_adv_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-        const advanceTx: Transaction = {
-          id: txId,
-          type: 'income',
-          amount: orderData.advance_amount,
-          category: orderData.service_type,
-          date: orderData.appointment_date,
-          note: `Advance payment for booking: ${orderData.customer_name}`,
-          order_id: orderId,
-          is_demo: orderData.is_demo,
-          created_at: new Date().toISOString(),
-        };
-        updatedTx = [advanceTx, ...updatedTx];
+    if (isNeonConnected) {
+      for (const orderData of ordersData) {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to create booking');
+        }
       }
-
-      setOrders(updatedOrders);
-      setTransactions(updatedTx);
-      saveToLocalStorage(updatedOrders, updatedTx);
+      await refreshData();
+    } else {
+      let nextOrders = [...orders];
+      let nextTx = [...transactions];
+      for (const orderData of ordersData) {
+        const next = createLocalOrder(orderData, nextOrders, nextTx);
+        nextOrders = next.orders;
+        nextTx = next.transactions;
+      }
+      setOrders(nextOrders);
+      setTransactions(nextTx);
+      saveToLocalStorage(nextOrders, nextTx);
     }
   };
 
@@ -234,7 +276,7 @@ export function useGlowBookData() {
         type: 'income',
         amount: Number(amount),
         category: targetOrder.service_type,
-        date: paymentDate || new Date().toISOString().split('T')[0],
+        date: paymentDate || localToday(),
         note: note?.trim() || `Payment received for ${targetOrder.customer_name} (${targetOrder.service_type})`,
         order_id: targetOrder.id,
         is_demo: targetOrder.is_demo,
@@ -322,6 +364,7 @@ export function useGlowBookData() {
     dbStatusMessage,
     refreshData,
     addOrder,
+    addOrders,
     updateOrder,
     deleteOrder,
     recordOrderPayment,

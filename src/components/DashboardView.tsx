@@ -9,14 +9,13 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   CreditCard,
-  Sparkles,
   ChevronRight,
-  ChevronLeft,
   Clock,
-  X,
 } from 'lucide-react';
 import { Order, Transaction } from '@/lib/types';
 import { Language, translations } from '@/lib/translations';
+import { DateFilterBar, DatePeriod } from '@/components/DateFilterBar';
+import { formatReadableDate, isToday, isTomorrow, localToday } from '@/lib/dates';
 
 interface DashboardViewProps {
   orders: Order[];
@@ -40,47 +39,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectTab,
 }) => {
   const t = translations[lang];
-  const [period, setPeriod] = useState<'today' | 'date' | 'month' | 'year' | 'all'>('today');
-  const [todayStr, setTodayStr] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const locale = lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const [period, setPeriod] = useState<DatePeriod>('today');
+  const [todayStr, setTodayStr] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
 
   useEffect(() => {
-    const now = new Date().toISOString().split('T')[0];
+    const now = localToday();
     setTodayStr(now);
     setSelectedDate(now);
   }, []);
 
-  const currentMonthStr = useMemo(() => (todayStr ? todayStr.substring(0, 7) : ''), [todayStr]);
-  const currentYearStr = useMemo(() => (todayStr ? todayStr.substring(0, 4) : ''), [todayStr]);
+  const currentMonthStr = todayStr ? todayStr.substring(0, 7) : '';
+  const currentYearStr = todayStr ? todayStr.substring(0, 4) : '';
 
-  // Day navigation helper (-1 or +1 day)
-  const shiftSelectedDate = (days: number) => {
-    const base = selectedDate || todayStr;
-    if (!base) return;
-    const [y, m, d] = base.split('-').map(Number);
-    const nextDate = new Date(y, m - 1, d + days);
-    const nextStr = nextDate.toISOString().split('T')[0];
-    setSelectedDate(nextStr);
-    setPeriod('date');
-  };
-
-  const formatReadableDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d);
-      return dateObj.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // Filter transactions based on selected dashboard period
   const filteredTx = useMemo(() => {
     return transactions.filter(tx => {
       if (period === 'today') return tx.date === todayStr;
@@ -91,22 +63,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [transactions, period, todayStr, selectedDate, currentMonthStr, currentYearStr]);
 
-  // Financial Stats for selected period
-  const totalIncome = useMemo(() => {
-    return filteredTx
-      .filter(tx => tx.type === 'income')
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
-  }, [filteredTx]);
-
-  const totalExpense = useMemo(() => {
-    return filteredTx
-      .filter(tx => tx.type === 'expense')
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
-  }, [filteredTx]);
-
+  const totalIncome = useMemo(
+    () => filteredTx.filter(tx => tx.type === 'income').reduce((acc, curr) => acc + Number(curr.amount), 0),
+    [filteredTx]
+  );
+  const totalExpense = useMemo(
+    () => filteredTx.filter(tx => tx.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0),
+    [filteredTx]
+  );
   const netProfit = totalIncome - totalExpense;
 
-  // Monthly stats for the banner
   const monthStats = useMemo(() => {
     const monthTx = transactions.filter(tx => tx.date.startsWith(currentMonthStr));
     const mIncome = monthTx.filter(t => t.type === 'income').reduce((a, c) => a + Number(c.amount), 0);
@@ -114,241 +80,94 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const pendingDue = orders
       .filter(o => o.status !== 'Cancelled')
       .reduce((a, c) => a + Number(c.remaining_balance), 0);
-    return {
-      income: mIncome,
-      profit: mIncome - mExpense,
-      pendingDue,
-    };
+    return { income: mIncome, profit: mIncome - mExpense, pendingDue };
   }, [transactions, orders, currentMonthStr]);
 
-  // Relevant Orders for the view:
-  // If a specific date is selected, show orders of that day!
-  // Otherwise, show upcoming orders ordered by date.
   const relevantOrders = useMemo(() => {
     if (period === 'date') {
-      return orders.filter(o => o.appointment_date === selectedDate);
+      return orders
+        .filter(o => o.appointment_date === selectedDate)
+        .sort((a, b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
+    }
+    if (period === 'today') {
+      return orders
+        .filter(o => o.appointment_date === todayStr && o.status !== 'Cancelled')
+        .sort((a, b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
     }
     return orders
       .filter(o => o.status === 'Upcoming')
       .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
       .slice(0, 5);
-  }, [orders, period, selectedDate]);
+  }, [orders, period, selectedDate, todayStr]);
 
   const getDateLabel = (dateStr: string) => {
-    if (dateStr === todayStr) return lang === 'hi' ? 'आज' : 'Today';
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-    if (dateStr === tomorrow) return lang === 'hi' ? 'कल' : 'Tomorrow';
+    if (isToday(dateStr, todayStr)) return lang === 'hi' ? 'आज' : 'Today';
+    if (isTomorrow(dateStr, todayStr)) return lang === 'hi' ? 'कल' : 'Tomorrow';
     return dateStr;
   };
 
+  const periodLabel =
+    period === 'date'
+      ? formatReadableDate(selectedDate, locale)
+      : period === 'today'
+      ? t.filterToday
+      : period === 'month'
+      ? t.filterMonth
+      : period === 'year'
+      ? t.filterYear
+      : t.filterAll;
+
   return (
     <div className="main-content">
-      {/* 1. Ergonomic Action Buttons (Hero New Booking + Side-by-Side Income/Expense) */}
       <div className="action-section">
-        <button
-          type="button"
-          onClick={onOpenAddOrder}
-          className="hero-action-btn"
-          aria-label={t.addOrder}
-        >
+        <button type="button" onClick={onOpenAddOrder} className="hero-action-btn" aria-label={t.addOrder}>
           <div className="hero-btn-left">
             <div className="hero-btn-icon">
               <Plus size={22} strokeWidth={2.6} />
             </div>
             <div className="hero-btn-text">
               <h3>{t.addOrder}</h3>
-              <p>{lang === 'hi' ? 'नई ग्राहक बुकिंग व एडवांस दर्ज करें' : 'Schedule appointment & record advance'}</p>
+              <p>
+                {lang === 'hi'
+                  ? 'ग्राहक, तारीख और समय दर्ज करें'
+                  : 'Customer, dates, and times'}
+              </p>
             </div>
           </div>
           <ChevronRight size={20} style={{ opacity: 0.8 }} />
         </button>
 
         <div className="sub-action-grid">
-          <button
-            type="button"
-            onClick={onOpenAddIncome}
-            className="sub-action-btn income-btn"
-          >
+          <button type="button" onClick={onOpenAddIncome} className="sub-action-btn income-btn">
             <ArrowDownRight size={20} strokeWidth={2.4} />
             <span>{t.addIncome}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onOpenAddExpense}
-            className="sub-action-btn expense-btn"
-          >
+          <button type="button" onClick={onOpenAddExpense} className="sub-action-btn expense-btn">
             <ArrowUpRight size={20} strokeWidth={2.4} />
             <span>{t.addExpense}</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Date Filter Pills */}
-      <div className="filter-pill-bar" role="tablist" aria-label="Date range filters">
-        <button
-          type="button"
-          onClick={() => setPeriod('today')}
-          className={`filter-pill ${period === 'today' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'today'}
-        >
-          {t.filterToday}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setPeriod('date');
-            if (!selectedDate && todayStr) setSelectedDate(todayStr);
-          }}
-          className={`filter-pill ${period === 'date' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'date'}
-        >
-          {t.filterPickDate}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('month')}
-          className={`filter-pill ${period === 'month' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'month'}
-        >
-          {t.filterMonth}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('year')}
-          className={`filter-pill ${period === 'year' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'year'}
-        >
-          {t.filterYear}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('all')}
-          className={`filter-pill ${period === 'all' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'all'}
-        >
-          {t.filterAll}
-        </button>
-      </div>
+      <DateFilterBar
+        lang={lang}
+        period={period}
+        onPeriodChange={setPeriod}
+        selectedDate={selectedDate}
+        onSelectedDateChange={setSelectedDate}
+        todayStr={todayStr}
+        periods={['today', 'date', 'month', 'year', 'all']}
+        clearToPeriod="today"
+      />
 
-      {/* Calendar Day Picker Bar (When "Pick Date" is selected) */}
-      {period === 'date' && (
-        <div
-          style={{
-            background: 'white',
-            borderRadius: '14px',
-            border: '1.5px solid var(--rose-primary)',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--rose-primary)' }}>
-              📅 {t.selectedDate}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPeriod('today')}
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                background: 'var(--bg-app)',
-              }}
-            >
-              <X size={14} />
-              <span>{lang === 'hi' ? 'आज का देखें' : "Show Today"}</span>
-            </button>
-          </div>
-
-          {/* Calendar Picker Control with Previous/Next Arrows */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => shiftSelectedDate(-1)}
-              className="icon-btn-ghost"
-              title="Previous Day"
-              aria-label="Previous Day"
-              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
-            >
-              <ChevronLeft size={20} />
-            </button>
-
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={e => {
-                setSelectedDate(e.target.value);
-                setPeriod('date');
-              }}
-              className="form-input"
-              style={{
-                flex: 1,
-                minHeight: '44px',
-                padding: '8px 12px',
-                fontSize: '1rem',
-                fontWeight: 700,
-                textAlign: 'center',
-              }}
-              aria-label="Pick specific date"
-            />
-
-            <button
-              type="button"
-              onClick={() => shiftSelectedDate(1)}
-              className="icon-btn-ghost"
-              title="Next Day"
-              aria-label="Next Day"
-              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
-            >
-              <ChevronRight size={20} />
-            </button>
-
-            {selectedDate !== todayStr && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDate(todayStr);
-                  setPeriod('date');
-                }}
-                className="btn-contact"
-                style={{ minHeight: '44px', padding: '0 12px', fontSize: '0.85rem' }}
-              >
-                {t.filterToday}
-              </button>
-            )}
-          </div>
-
-          {/* Readable Date Display */}
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 600 }}>
-            {formatReadableDate(selectedDate)}
-          </div>
-        </div>
-      )}
-
-      {/* 3. Core Stats Cards */}
       <div className="stats-container">
         <div className="stat-card income-card">
           <div className="stat-label">
             <ArrowDownRight size={15} color="var(--income-text)" />
-            <span>{period === 'date' ? `${formatReadableDate(selectedDate)} ${t.totalIncome}` : t.totalIncome}</span>
+            <span>{t.totalIncome}</span>
           </div>
           <div className="stat-value income">₹ {totalIncome.toLocaleString('en-IN')}</div>
         </div>
-
         <div className="stat-card expense-card">
           <div className="stat-label">
             <ArrowUpRight size={15} color="var(--expense-text)" />
@@ -356,46 +175,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="stat-value expense">₹ {totalExpense.toLocaleString('en-IN')}</div>
         </div>
-
         <div className="stat-card profit-card">
           <div className="stat-label">
-            <Sparkles size={15} color="var(--rose-primary)" />
             <span>{t.netProfit}</span>
           </div>
           <div className="stat-value profit">₹ {netProfit.toLocaleString('en-IN')}</div>
         </div>
       </div>
 
-      {/* 4. Month Overview Highlight Banner */}
       <div className="highlight-banner">
         <div className="banner-content">
           <h4>{t.monthIncome}</h4>
           <p>
-            {t.pendingBalance}: <strong style={{ color: 'var(--pending-text)' }}>₹ {monthStats.pendingDue.toLocaleString('en-IN')}</strong>
+            {t.pendingBalance}:{' '}
+            <strong className="text-pending">₹ {monthStats.pendingDue.toLocaleString('en-IN')}</strong>
           </p>
         </div>
         <div className="banner-badge">
-          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>{t.monthProfit}</div>
+          <div className="banner-badge-label">{t.monthProfit}</div>
           <div className="badge-val">₹ {monthStats.profit.toLocaleString('en-IN')}</div>
         </div>
       </div>
 
-      {/* 5. Appointments Section (For the selected day or upcoming) */}
       <div>
         <div className="section-header">
           <h2 className="section-title">
-            <Calendar size={19} color="var(--rose-primary)" />
+            <Calendar size={18} />
             <span>
-              {period === 'date'
-                ? `${formatReadableDate(selectedDate)} (${relevantOrders.length})`
+              {period === 'date' || period === 'today'
+                ? `${periodLabel} (${relevantOrders.length})`
                 : `${t.upcomingOrders} (${relevantOrders.length})`}
             </span>
           </h2>
-          <button
-            type="button"
-            onClick={() => onSelectTab('orders')}
-            className="section-action"
-          >
+          <button type="button" onClick={() => onSelectTab('orders')} className="section-action">
             <span>{lang === 'hi' ? 'सभी देखें' : 'View all'}</span>
             <ChevronRight size={16} />
           </button>
@@ -407,51 +219,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Calendar size={26} />
             </div>
             <div className="empty-title">
-              {period === 'date'
+              {period === 'date' || period === 'today'
                 ? lang === 'hi'
                   ? 'इस तारीख को कोई बुकिंग नहीं है'
                   : 'No bookings for this date'
                 : t.noUpcomingToday}
             </div>
-            <div className="empty-subtitle">
-              {period === 'date' ? formatReadableDate(selectedDate) : t.addFirstOrder}
-            </div>
+            <div className="empty-subtitle">{t.addFirstOrder}</div>
           </div>
         ) : (
-          <div className="card-list" style={{ marginTop: '8px' }}>
+          <div className="card-list" style={{ marginTop: 8 }}>
             {relevantOrders.map(order => {
-              const isTodayOrTomorrow =
-                order.appointment_date === todayStr ||
-                order.appointment_date === new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
+              const highlight =
+                isToday(order.appointment_date, todayStr) || isTomorrow(order.appointment_date, todayStr);
               return (
-                <div
-                  key={order.id}
-                  className="order-card"
-                  style={{
-                    borderLeft: isTodayOrTomorrow
-                      ? '4px solid var(--rose-primary)'
-                      : '1px solid var(--rose-border)',
-                  }}
-                >
+                <div key={order.id} className={`order-card ${highlight ? 'order-card-highlight' : ''}`}>
                   <div className="order-card-top">
                     <div className="order-customer">
-                      <div className="customer-name">
-                        <span>{order.customer_name}</span>
-                      </div>
+                      <div className="customer-name">{order.customer_name}</div>
                       <div className="service-title">{order.service_type}</div>
                     </div>
-
                     <div className="appointment-badge">
                       <Clock size={12} />
                       <span>
                         {getDateLabel(order.appointment_date)}
-                        {order.appointment_time ? ` • ${order.appointment_time}` : ''}
+                        {order.appointment_time ? ` · ${order.appointment_time}` : ''}
                       </span>
                     </div>
                   </div>
 
-                  {/* Financial Snapshot */}
                   <div className="order-money-grid">
                     <div className="money-box">
                       <span className="money-label">{t.totalPrice}</span>
@@ -465,54 +261,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className="money-label">{t.balanceDue}</span>
                       <span
                         className="money-amount due"
-                        style={{ color: order.remaining_balance > 0 ? 'var(--pending-text)' : 'var(--income-text)' }}
+                        style={{
+                          color: order.remaining_balance > 0 ? 'var(--pending-text)' : 'var(--income-text)',
+                        }}
                       >
                         ₹{order.remaining_balance.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
 
-                  {order.notes && (
-                    <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      "{order.notes}"
-                    </div>
-                  )}
+                  {order.notes && <div className="order-notes">{order.notes}</div>}
 
-                  {/* Quick Action Buttons */}
                   <div className="order-actions">
-                    {order.remaining_balance > 0 && (
+                    {order.remaining_balance > 0 && order.status !== 'Cancelled' && (
                       <button
                         type="button"
                         onClick={() => onCollectPayment(order)}
                         className="btn-collect-payment"
                       >
                         <CreditCard size={15} />
-                        <span>{t.collectPayment} (₹{order.remaining_balance.toLocaleString('en-IN')})</span>
+                        <span>
+                          {t.collectPayment} (₹{order.remaining_balance.toLocaleString('en-IN')})
+                        </span>
                       </button>
                     )}
-
                     {order.phone_number && (
                       <>
                         <a
                           href={`https://wa.me/91${order.phone_number.replace(/\D/g, '')}?text=${encodeURIComponent(
                             lang === 'hi'
-                              ? `नमस्ते ${order.customer_name} जी! आपकी ${order.service_type} की बुकिंग ${order.appointment_date} को है। GlowBook से संदेश।`
+                              ? `नमस्ते ${order.customer_name} जी! आपकी ${order.service_type} की बुकिंग ${order.appointment_date} को है।`
                               : `Hello ${order.customer_name}, confirming your appointment for ${order.service_type} on ${order.appointment_date}.`
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-contact whatsapp"
-                          title="WhatsApp"
                         >
                           <MessageCircle size={15} />
                           <span>WhatsApp</span>
                         </a>
-
-                        <a
-                          href={`tel:${order.phone_number}`}
-                          className="btn-contact"
-                          title="Call"
-                        >
+                        <a href={`tel:${order.phone_number}`} className="btn-contact">
                           <Phone size={15} />
                           <span>{t.callNow}</span>
                         </a>
@@ -526,24 +314,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* 6. Transactions Quick Preview */}
       <div>
         <div className="section-header">
           <h2 className="section-title">
-            <ArrowDownRight size={19} color="var(--income-text)" />
+            <ArrowDownRight size={18} />
             <span>
-              {period === 'date'
-                ? `${formatReadableDate(selectedDate)} (${filteredTx.length})`
-                : period === 'today'
-                ? t.todayIncome
-                : t.totalIncome}
+              {periodLabel} · {filteredTx.length}{' '}
+              {lang === 'hi' ? 'लेन-देन' : 'txns'}
             </span>
           </h2>
-          <button
-            type="button"
-            onClick={() => onSelectTab('transactions')}
-            className="section-action"
-          >
+          <button type="button" onClick={() => onSelectTab('transactions')} className="section-action">
             <span>{lang === 'hi' ? 'सभी देखें' : 'View all'}</span>
             <ChevronRight size={16} />
           </button>
@@ -551,16 +331,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {filteredTx.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon-wrap">
-              <Sparkles size={26} />
-            </div>
             <div className="empty-title">{t.noTransactionsFound}</div>
-            <div className="empty-subtitle">
-              {period === 'date' ? formatReadableDate(selectedDate) : t.addFirstTx}
-            </div>
+            <div className="empty-subtitle">{t.addFirstTx}</div>
           </div>
         ) : (
-          <div className="card-list" style={{ marginTop: '8px' }}>
+          <div className="card-list" style={{ marginTop: 8 }}>
             {filteredTx.slice(0, 4).map(tx => (
               <div key={tx.id} className="tx-card">
                 <div className="tx-card-left">
@@ -571,11 +346,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="tx-category">{tx.category}</span>
                     <span className="tx-date-note">
                       <span>{tx.date}</span>
-                      {tx.note && <span>• {tx.note}</span>}
+                      {tx.note && <span>· {tx.note}</span>}
                     </span>
                   </div>
                 </div>
-
                 <div className="tx-card-right">
                   <span className={`tx-amount ${tx.type}`}>
                     {tx.type === 'income' ? '+' : '-'} ₹{tx.amount.toLocaleString('en-IN')}

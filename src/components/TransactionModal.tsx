@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Transaction, TransactionType } from '@/lib/types';
 import { Language, translations, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/lib/translations';
+import { localToday } from '@/lib/dates';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else {
       setType(defaultType);
       setAmount('');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(localToday());
       setCategory(defaultType === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
       setNote('');
     }

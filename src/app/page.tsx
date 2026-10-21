@@ -45,6 +45,7 @@ export default function Home() {
     isNeonConnected,
     isLoading,
     addOrder,
+    addOrders,
     updateOrder,
     deleteOrder,
     recordOrderPayment,
@@ -157,52 +158,20 @@ export default function Home() {
 
       {/* Database Setup Banner (Visible when DATABASE_URL is not yet connected) */}
       {!isNeonConnected && !isLoading && (
-        <div
-          style={{
-            margin: '10px 16px 0',
-            padding: '10px 14px',
-            borderRadius: '12px',
-            background: '#FEF3C7',
-            border: '1px solid #FCD9BD',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '0.84rem',
-            color: '#963E09',
-          }}
-        >
+        <div className="system-banner">
           <Info size={18} style={{ flexShrink: 0 }} />
           <div>
-            <strong>{lang === 'hi' ? 'डिवाइस स्टोरेज मोड:' : 'Device Storage Mode:'}</strong>{' '}
+            <strong>{lang === 'hi' ? 'डिवाइस स्टोरेज:' : 'Device storage:'}</strong>{' '}
             {lang === 'hi'
-              ? 'आपका डेटा सुरक्षित सेव हो रहा है।'
-              : 'Your data is being saved safely on this device.'}
+              ? 'आपका डेटा इस डिवाइस पर सुरक्षित सेव हो रहा है।'
+              : 'Your data is saved safely on this device.'}
           </div>
         </div>
       )}
 
-      {/* 2. Toast Notification */}
       {toastMsg && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 'calc(70px + env(safe-area-inset-top, 0px))',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 110,
-            background: 'var(--text-main)',
-            color: 'white',
-            padding: '10px 20px',
-            borderRadius: '30px',
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Check size={16} color="#34D399" />
+        <div className="app-toast">
+          <Check size={16} color="#6EE7B7" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -281,6 +250,10 @@ export default function Home() {
           } else {
             await addOrder(orderData);
           }
+          showToast(t.savedSuccess);
+        }}
+        onSaveMany={async ordersData => {
+          await addOrders(ordersData);
           showToast(t.savedSuccess);
         }}
       />

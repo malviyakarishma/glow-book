@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, IndianRupee } from 'lucide-react';
 import { Order } from '@/lib/types';
 import { Language, translations } from '@/lib/translations';
+import { localToday } from '@/lib/dates';
 
 interface CollectPaymentModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({
   useEffect(() => {
     if (order) {
       setAmount(String(order.remaining_balance));
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentDate(localToday());
       setPaymentNote(
         lang === 'hi'
           ? `${order.customer_name} से बाकी भुगतान मिला`

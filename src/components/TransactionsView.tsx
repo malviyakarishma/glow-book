@@ -4,19 +4,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Plus,
   Download,
   Edit2,
   Trash2,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  X,
 } from 'lucide-react';
 import { Transaction, TransactionType } from '@/lib/types';
 import { Language, translations, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/lib/translations';
 import { exportTransactionsToCsv } from '@/lib/export';
+import { DateFilterBar, DatePeriod } from '@/components/DateFilterBar';
+import { localToday } from '@/lib/dates';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -37,58 +33,27 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 }) => {
   const t = translations[lang];
 
-  const [todayStr, setTodayStr] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [period, setPeriod] = useState<'today' | 'date' | 'month' | 'year' | 'all' | 'custom'>('month');
-  const [customStart, setCustomStart] = useState<string>('');
-  const [customEnd, setCustomEnd] = useState<string>('');
+  const [todayStr, setTodayStr] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [period, setPeriod] = useState<DatePeriod>('month');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    const now = new Date().toISOString().split('T')[0];
+    const now = localToday();
     setTodayStr(now);
     setSelectedDate(now);
     setCustomStart(now);
     setCustomEnd(now);
   }, []);
 
-  const currentMonthStr = useMemo(() => (todayStr ? todayStr.substring(0, 7) : ''), [todayStr]);
-  const currentYearStr = useMemo(() => (todayStr ? todayStr.substring(0, 4) : ''), [todayStr]);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const currentMonthStr = todayStr ? todayStr.substring(0, 7) : '';
+  const currentYearStr = todayStr ? todayStr.substring(0, 4) : '';
 
-  // Day navigation helper (-1 or +1 day)
-  const shiftSelectedDate = (days: number) => {
-    const base = selectedDate || todayStr;
-    if (!base) return;
-    const [y, m, d] = base.split('-').map(Number);
-    const nextDate = new Date(y, m - 1, d + days);
-    const nextStr = nextDate.toISOString().split('T')[0];
-    setSelectedDate(nextStr);
-    setPeriod('date');
-  };
-
-  // Helper to format date in readable form
-  const formatReadableDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d);
-      return dateObj.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // Filtered transactions
   const filtered = useMemo(() => {
     return transactions.filter(tx => {
-      // Date filter
       if (period === 'today' && tx.date !== todayStr) return false;
       if (period === 'date' && tx.date !== selectedDate) return false;
       if (period === 'month' && !tx.date.startsWith(currentMonthStr)) return false;
@@ -98,19 +63,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         if (customEnd && tx.date > customEnd) return false;
       }
 
-      // Type filter
       if (typeFilter !== 'all' && tx.type !== typeFilter) return false;
-
-      // Category filter
       if (categoryFilter !== 'all' && tx.category !== categoryFilter) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchCategory = tx.category.toLowerCase().includes(q);
-        const matchNote = tx.note?.toLowerCase().includes(q);
-        if (!matchCategory && !matchNote) return false;
-      }
 
       return true;
     });
@@ -125,39 +79,30 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     customEnd,
     typeFilter,
     categoryFilter,
-    searchQuery,
   ]);
 
-  // Summaries for the selected day/period
-  const totalIncome = useMemo(() => {
-    return filtered
-      .filter(t => t.type === 'income')
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
-  }, [filtered]);
-
-  const totalExpense = useMemo(() => {
-    return filtered
-      .filter(t => t.type === 'expense')
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
-  }, [filtered]);
-
+  const totalIncome = useMemo(
+    () => filtered.filter(t => t.type === 'income').reduce((acc, curr) => acc + Number(curr.amount), 0),
+    [filtered]
+  );
+  const totalExpense = useMemo(
+    () => filtered.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0),
+    [filtered]
+  );
   const netProfit = totalIncome - totalExpense;
-
-  // Chart data: percentages
   const grandTotal = totalIncome + totalExpense;
   const incomePercent = grandTotal > 0 ? Math.round((totalIncome / grandTotal) * 100) : 50;
   const expensePercent = grandTotal > 0 ? 100 - incomePercent : 50;
 
-  // Category breakdown
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, { type: TransactionType; amount: number }> = {};
     for (const tx of filtered) {
-      if (!map[tx.category]) {
-        map[tx.category] = { type: tx.type, amount: 0 };
-      }
+      if (!map[tx.category]) map[tx.category] = { type: tx.type, amount: 0 };
       map[tx.category].amount += Number(tx.amount);
     }
-    return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount).slice(0, 4);
+    return Object.entries(map)
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .slice(0, 4);
   }, [filtered]);
 
   const allAvailableCategories = Array.from(
@@ -166,248 +111,62 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
   return (
     <div className="main-content">
-      {/* Top Header Row with Export and Action Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-          {t.incomeExpense}
-        </h2>
-
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div className="page-toolbar">
+        <h2 className="page-title">{t.incomeExpense}</h2>
+        <div className="page-toolbar-actions">
           <button
             type="button"
             onClick={() => exportTransactionsToCsv(filtered)}
             className="btn-contact"
-            title="Download CSV report"
             aria-label="Export CSV"
           >
             <Download size={16} />
             <span>CSV</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onOpenAddIncome}
-            className="sub-action-btn income-btn"
-            style={{ padding: '8px 14px', minHeight: '44px' }}
-          >
+          <button type="button" onClick={onOpenAddIncome} className="sub-action-btn income-btn btn-compact">
             <span>+ {t.income}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onOpenAddExpense}
-            className="sub-action-btn expense-btn"
-            style={{ padding: '8px 14px', minHeight: '44px' }}
-          >
+          <button type="button" onClick={onOpenAddExpense} className="sub-action-btn expense-btn btn-compact">
             <span>+ {t.expense}</span>
           </button>
         </div>
       </div>
 
-      {/* Date Period Filter Pills */}
-      <div className="filter-pill-bar" role="tablist" aria-label="Transaction date filters">
-        <button
-          type="button"
-          onClick={() => setPeriod('today')}
-          className={`filter-pill ${period === 'today' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'today'}
-        >
-          {t.filterToday}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setPeriod('date');
-            if (!selectedDate && todayStr) setSelectedDate(todayStr);
-          }}
-          className={`filter-pill ${period === 'date' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'date'}
-        >
-          {t.filterPickDate}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('month')}
-          className={`filter-pill ${period === 'month' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'month'}
-        >
-          {t.filterMonth}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('year')}
-          className={`filter-pill ${period === 'year' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'year'}
-        >
-          {t.filterYear}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('all')}
-          className={`filter-pill ${period === 'all' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'all'}
-        >
-          {t.filterAll}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod('custom')}
-          className={`filter-pill ${period === 'custom' ? 'active' : ''}`}
-          role="tab"
-          aria-selected={period === 'custom'}
-        >
-          {t.filterCustom}
-        </button>
-      </div>
+      <DateFilterBar
+        lang={lang}
+        period={period}
+        onPeriodChange={setPeriod}
+        selectedDate={selectedDate}
+        onSelectedDateChange={setSelectedDate}
+        todayStr={todayStr}
+        periods={['today', 'date', 'month', 'year', 'all', 'custom']}
+        resultCount={period === 'date' ? filtered.length : undefined}
+        clearToPeriod="month"
+      />
 
-      {/* Calendar Day Picker Bar (When "Pick Date" is selected) */}
-      {period === 'date' && (
-        <div
-          style={{
-            background: 'white',
-            borderRadius: '14px',
-            border: '1.5px solid var(--rose-primary)',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--rose-primary)' }}>
-              📅 {t.selectedDate}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPeriod('month')}
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                background: 'var(--bg-app)',
-              }}
-            >
-              <X size={14} />
-              <span>{lang === 'hi' ? 'महीने का देखें' : 'Show Month'}</span>
-            </button>
-          </div>
-
-          {/* Calendar Picker Control with Previous/Next Arrows */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => shiftSelectedDate(-1)}
-              className="icon-btn-ghost"
-              title="Previous Day"
-              aria-label="Previous Day"
-              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
-            >
-              <ChevronLeft size={20} />
-            </button>
-
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={e => {
-                setSelectedDate(e.target.value);
-                setPeriod('date');
-              }}
-              className="form-input"
-              style={{
-                flex: 1,
-                minHeight: '44px',
-                padding: '8px 12px',
-                fontSize: '1rem',
-                fontWeight: 700,
-                textAlign: 'center',
-              }}
-              aria-label="Pick specific date"
-            />
-
-            <button
-              type="button"
-              onClick={() => shiftSelectedDate(1)}
-              className="icon-btn-ghost"
-              title="Next Day"
-              aria-label="Next Day"
-              style={{ minWidth: '40px', minHeight: '44px', borderRadius: '10px' }}
-            >
-              <ChevronRight size={20} />
-            </button>
-
-            {selectedDate !== todayStr && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDate(todayStr);
-                  setPeriod('date');
-                }}
-                className="btn-contact"
-                style={{ minHeight: '44px', padding: '0 12px', fontSize: '0.85rem' }}
-              >
-                {t.filterToday}
-              </button>
-            )}
-          </div>
-
-          {/* Readable Date Display */}
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 600 }}>
-            {formatReadableDate(selectedDate)} •{' '}
-            <strong style={{ color: 'var(--text-main)' }}>
-              {filtered.length} {lang === 'hi' ? 'लेन-देन दर्ज' : 'transactions found'}
-            </strong>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Date Range Picker */}
       {period === 'custom' && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '10px',
-            background: 'white',
-            padding: '12px',
-            borderRadius: '12px',
-            border: '1px solid var(--rose-border)',
-          }}
-        >
-          <div>
-            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>From</label>
+        <div className="date-range-bar">
+          <div className="form-group">
+            <label className="form-label-sub">{lang === 'hi' ? 'शुरू' : 'From'}</label>
             <input
               type="date"
               value={customStart}
               onChange={e => setCustomStart(e.target.value)}
               className="form-input"
-              style={{ padding: '8px 10px', minHeight: '44px' }}
             />
           </div>
-          <div>
-            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>To</label>
+          <div className="form-group">
+            <label className="form-label-sub">{lang === 'hi' ? 'अंत' : 'To'}</label>
             <input
               type="date"
               value={customEnd}
               onChange={e => setCustomEnd(e.target.value)}
               className="form-input"
-              style={{ padding: '8px 10px', minHeight: '44px' }}
             />
           </div>
         </div>
       )}
 
-      {/* Totals Summary Cards (Recalculated for the selected day or period) */}
       <div className="stats-container">
         <div className="stat-card income-card">
           <div className="stat-label">
@@ -416,7 +175,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </div>
           <div className="stat-value income">₹ {totalIncome.toLocaleString('en-IN')}</div>
         </div>
-
         <div className="stat-card expense-card">
           <div className="stat-label">
             <ArrowUpRight size={15} color="var(--expense-text)" />
@@ -424,37 +182,32 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </div>
           <div className="stat-value expense">₹ {totalExpense.toLocaleString('en-IN')}</div>
         </div>
-
         <div className="stat-card profit-card">
           <div className="stat-label">
-            <Sparkles size={15} color="var(--rose-primary)" />
             <span>{t.netProfit}</span>
           </div>
           <div className="stat-value profit">₹ {netProfit.toLocaleString('en-IN')}</div>
         </div>
       </div>
 
-      {/* Visual Chart (Income vs Expense Ratio) */}
       <div className="chart-box">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            {lang === 'hi' ? 'आय और खर्च का अनुपात (Income vs Expense)' : 'Income vs Expense Split'}
+        <div className="chart-box-header">
+          <span className="chart-box-title">
+            {lang === 'hi' ? 'आय बनाम खर्च' : 'Income vs Expense'}
           </span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <span className="chart-box-meta">
             {filtered.length} {lang === 'hi' ? 'एंट्री' : 'entries'}
           </span>
         </div>
 
-        <div className="progress-split" role="progressbar" aria-valuenow={incomePercent} aria-valuemin={0} aria-valuemax={100}>
+        <div className="progress-split" role="progressbar" aria-valuenow={incomePercent}>
           <div
             className="progress-segment income"
             style={{ width: `${grandTotal > 0 ? incomePercent : 50}%` }}
-            title={`Income: ${incomePercent}%`}
           />
           <div
             className="progress-segment expense"
             style={{ width: `${grandTotal > 0 ? expensePercent : 50}%` }}
-            title={`Expense: ${expensePercent}%`}
           />
         </div>
 
@@ -462,40 +215,38 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           <div className="legend-item">
             <div className="legend-dot" style={{ background: 'var(--income-bar)' }} />
             <span style={{ color: 'var(--income-text)' }}>
-              {t.income}: {grandTotal > 0 ? `${incomePercent}% (₹${totalIncome.toLocaleString('en-IN')})` : '0%'}
+              {t.income}: {grandTotal > 0 ? `${incomePercent}%` : '0%'}
             </span>
           </div>
           <div className="legend-item">
             <div className="legend-dot" style={{ background: 'var(--expense-bar)' }} />
             <span style={{ color: 'var(--expense-text)' }}>
-              {t.expense}: {grandTotal > 0 ? `${expensePercent}% (₹${totalExpense.toLocaleString('en-IN')})` : '0%'}
+              {t.expense}: {grandTotal > 0 ? `${expensePercent}%` : '0%'}
             </span>
           </div>
         </div>
 
-        {/* Top Category Mini-Meters */}
         {categoryBreakdown.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--rose-border-subtle)' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              {lang === 'hi' ? 'मुख्य केटेगरी (Top Categories)' : 'Top Categories'}
+          <div className="category-breakdown">
+            <span className="form-label-sub">
+              {lang === 'hi' ? 'मुख्य केटेगरी' : 'Top categories'}
             </span>
             {categoryBreakdown.map(([cat, info]) => {
               const catPercent = grandTotal > 0 ? Math.round((info.amount / grandTotal) * 100) : 0;
               return (
-                <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                    <span style={{ fontWeight: 600 }}>{cat}</span>
-                    <span style={{ fontWeight: 700, color: info.type === 'income' ? 'var(--income-text)' : 'var(--expense-text)' }}>
-                      ₹{info.amount.toLocaleString('en-IN')} ({catPercent}%)
+                <div key={cat} className="category-row">
+                  <div className="category-row-top">
+                    <span>{cat}</span>
+                    <span style={{ color: info.type === 'income' ? 'var(--income-text)' : 'var(--expense-text)' }}>
+                      ₹{info.amount.toLocaleString('en-IN')}
                     </span>
                   </div>
-                  <div style={{ height: '6px', background: '#F3F4F6', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div className="category-bar-track">
                     <div
+                      className="category-bar-fill"
                       style={{
-                        height: '100%',
-                        width: `${Math.min(100, Math.max(5, catPercent))}%`,
+                        width: `${Math.min(100, Math.max(4, catPercent))}%`,
                         background: info.type === 'income' ? 'var(--income-bar)' : 'var(--expense-bar)',
-                        borderRadius: '4px',
                       }}
                     />
                   </div>
@@ -506,48 +257,34 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         )}
       </div>
 
-      {/* Filter Row: Type + Category */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="filter-row">
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value as 'all' | 'income' | 'expense')}
           className="form-select"
-          aria-label="Filter by transaction type"
         >
           <option value="all">{t.allTypes}</option>
           <option value="income">{t.incomeOnly}</option>
           <option value="expense">{t.expenseOnly}</option>
         </select>
-
         <select
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
           className="form-select"
-          aria-label="Filter by transaction category"
         >
           <option value="all">{t.allCategories}</option>
           {allAvailableCategories.map(c => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
       </div>
 
-      {/* Transactions List */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon-wrap">
-            <Sparkles size={26} />
-          </div>
-          <div className="empty-title">
-            {period === 'date'
-              ? `${lang === 'hi' ? 'इस तारीख को कोई लेन-देन नहीं है' : 'No transactions for this date'}`
-              : t.noTransactionsFound}
-          </div>
-          <div className="empty-subtitle">
-            {period === 'date'
-              ? `${formatReadableDate(selectedDate)}`
-              : t.addFirstTx}
-          </div>
+          <div className="empty-title">{t.noTransactionsFound}</div>
+          <div className="empty-subtitle">{t.addFirstTx}</div>
         </div>
       ) : (
         <div className="card-list">
@@ -557,41 +294,24 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <div className={`tx-icon-circle ${tx.type}`}>
                   {tx.type === 'income' ? <ArrowDownRight size={19} /> : <ArrowUpRight size={19} />}
                 </div>
-
                 <div className="tx-info">
                   <span className="tx-category">{tx.category}</span>
                   <span className="tx-date-note">
-                    <span style={{ fontWeight: 600 }}>{tx.date}</span>
-                    {tx.note && <span>• {tx.note}</span>}
-                    {tx.order_id && (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          background: 'var(--bg-rose-tint)',
-                          color: 'var(--rose-primary)',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          fontWeight: 700,
-                        }}
-                      >
-                        Booking
-                      </span>
-                    )}
+                    <span>{tx.date}</span>
+                    {tx.note && <span>· {tx.note}</span>}
+                    {tx.order_id && <span className="booking-chip">Booking</span>}
                   </span>
                 </div>
               </div>
-
               <div className="tx-card-right">
                 <span className={`tx-amount ${tx.type}`}>
                   {tx.type === 'income' ? '+' : '-'} ₹{tx.amount.toLocaleString('en-IN')}
                 </span>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div className="order-actions-end">
                   <button
                     type="button"
                     onClick={() => onEditTransaction(tx)}
                     className="icon-btn-ghost"
-                    title={t.edit}
                     aria-label="Edit transaction"
                   >
                     <Edit2 size={16} />
@@ -600,7 +320,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     type="button"
                     onClick={() => onDeleteTransaction(tx.id)}
                     className="icon-btn-ghost danger"
-                    title={t.delete}
                     aria-label="Delete transaction"
                   >
                     <Trash2 size={16} />

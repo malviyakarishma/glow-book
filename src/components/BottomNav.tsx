@@ -25,12 +25,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'orders' as const,
-      label: lang === 'hi' ? 'बुकिंग / ऑर्डर्स' : 'Orders',
+      label: lang === 'hi' ? 'ऑर्डर्स' : 'Orders',
       icon: CalendarCheck,
     },
     {
       id: 'transactions' as const,
-      label: lang === 'hi' ? 'आय और खर्च' : 'Finances',
+      label: lang === 'hi' ? 'खाता' : 'Cashbook',
       icon: Receipt,
     },
   ];
@@ -49,7 +49,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             aria-current={isActive ? 'page' : undefined}
           >
             <div className="bottom-nav-icon-wrap">
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <Icon size={20} strokeWidth={isActive ? 2.4 : 1.8} />
             </div>
             <span className="bottom-nav-label">{item.label}</span>
           </button>

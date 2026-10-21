@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Globe, LayoutDashboard, CalendarCheck, Receipt } from 'lucide-react';
+import { Globe, LayoutDashboard, CalendarCheck, Receipt } from 'lucide-react';
 import { Language, translations } from '@/lib/translations';
 
 interface HeaderProps {
@@ -22,10 +22,9 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="app-header">
       <div className="header-inner">
-        {/* Brand */}
         <div className="brand-wrapper">
           <div className="brand-icon" aria-hidden="true">
-            <Sparkles size={20} strokeWidth={2.4} />
+            G
           </div>
           <div className="brand-text">
             <h1 className="brand-title">{t.appName}</h1>
@@ -33,7 +32,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Desktop Navigation Links (Visible on >= 768px) */}
         {onSelectTab && (
           <nav className="desktop-nav" aria-label="Desktop Navigation">
             <button
@@ -41,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onSelectTab('dashboard')}
               className={`desktop-nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
             >
-              <LayoutDashboard size={17} />
+              <LayoutDashboard size={16} />
               <span>{t.dashboard}</span>
             </button>
             <button
@@ -49,23 +47,21 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onSelectTab('orders')}
               className={`desktop-nav-link ${activeTab === 'orders' ? 'active' : ''}`}
             >
-              <CalendarCheck size={17} />
-              <span>{t.orders}</span>
+              <CalendarCheck size={16} />
+              <span>{lang === 'hi' ? 'ऑर्डर्स' : 'Orders'}</span>
             </button>
             <button
               type="button"
               onClick={() => onSelectTab('transactions')}
               className={`desktop-nav-link ${activeTab === 'transactions' ? 'active' : ''}`}
             >
-              <Receipt size={17} />
-              <span>{t.incomeExpense}</span>
+              <Receipt size={16} />
+              <span>{lang === 'hi' ? 'खाता' : 'Cashbook'}</span>
             </button>
           </nav>
         )}
 
-        {/* Header Actions */}
         <div className="header-actions">
-          {/* Language Switcher */}
           <button
             type="button"
             onClick={onToggleLang}
@@ -74,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label={`Switch to ${lang === 'en' ? 'Hindi' : 'English'}`}
           >
             <Globe size={15} />
-            <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
+            <span>{lang === 'en' ? 'हिन्दी' : 'EN'}</span>
           </button>
         </div>
       </div>

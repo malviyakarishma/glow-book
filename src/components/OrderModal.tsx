@@ -1,39 +1,58 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Order, OrderStatus } from '@/lib/types';
 import { Language, translations, INCOME_CATEGORIES } from '@/lib/translations';
+import { eachDateInRange, formatReadableDate, localToday } from '@/lib/dates';
+
+interface DaySchedule {
+  date: string;
+  times: string[];
+}
 
 interface OrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onSaveMany?: (orders: Omit<Order, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
   initialData?: Order | null;
   lang: Language;
+}
+
+function syncSchedules(prev: DaySchedule[], dates: string[], defaultTime = '11:00 AM'): DaySchedule[] {
+  const map = new Map(prev.map(d => [d.date, d.times]));
+  return dates.map(date => ({
+    date,
+    times: map.get(date) ?? [defaultTime],
+  }));
 }
 
 export const OrderModal: React.FC<OrderModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onSaveMany,
   initialData,
   lang,
 }) => {
   const t = translations[lang];
+  const locale = lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const isEditing = Boolean(initialData);
 
-  const [customerName, setCustomerName] = useState<string>('');
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [customerName, setCustomerName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [serviceType, setServiceType] = useState<string>(INCOME_CATEGORIES[0]);
-  const [customService, setCustomService] = useState<string>('');
-  const [appointmentDate, setAppointmentDate] = useState<string>('');
-  const [appointmentTime, setAppointmentTime] = useState<string>('11:00 AM');
-  const [totalPrice, setTotalPrice] = useState<string>('');
-  const [advanceAmount, setAdvanceAmount] = useState<string>('0');
-  const [notes, setNotes] = useState<string>('');
+  const [customService, setCustomService] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
+  const [totalPrice, setTotalPrice] = useState('');
+  const [advanceAmount, setAdvanceAmount] = useState('0');
+  const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<OrderStatus>('Upcoming');
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -46,19 +65,27 @@ export const OrderModal: React.FC<OrderModalProps> = ({
         setServiceType('Other Service');
         setCustomService(initialData.service_type);
       }
-      setAppointmentDate(initialData.appointment_date);
-      setAppointmentTime(initialData.appointment_time || '11:00 AM');
+      setDateFrom(initialData.appointment_date);
+      setDateTo(initialData.appointment_date);
+      setDaySchedules([
+        {
+          date: initialData.appointment_date,
+          times: [initialData.appointment_time || '11:00 AM'],
+        },
+      ]);
       setTotalPrice(String(initialData.total_price));
       setAdvanceAmount(String(initialData.advance_amount));
       setNotes(initialData.notes || '');
       setStatus(initialData.status);
     } else {
+      const today = localToday();
       setCustomerName('');
       setPhoneNumber('');
       setServiceType(INCOME_CATEGORIES[0]);
       setCustomService('');
-      setAppointmentDate(new Date().toISOString().split('T')[0]);
-      setAppointmentTime('11:00 AM');
+      setDateFrom(today);
+      setDateTo(today);
+      setDaySchedules([{ date: today, times: ['11:00 AM'] }]);
       setTotalPrice('');
       setAdvanceAmount('0');
       setNotes('');
@@ -67,12 +94,59 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     setErrorMsg('');
   }, [initialData, isOpen]);
 
+  // Keep per-date times in sync when From/To changes
+  useEffect(() => {
+    if (!isOpen || isEditing || !dateFrom) return;
+    const dates = eachDateInRange(dateFrom, dateTo || dateFrom);
+    setDaySchedules(prev => syncSchedules(prev, dates));
+  }, [dateFrom, dateTo, isOpen, isEditing]);
+
+  const slots = useMemo(() => {
+    const list: { date: string; time: string }[] = [];
+    for (const day of daySchedules) {
+      const clean = day.times.map(tm => tm.trim()).filter(Boolean);
+      if (clean.length === 0) {
+        list.push({ date: day.date, time: '' });
+      } else {
+        for (const time of clean) {
+          list.push({ date: day.date, time });
+        }
+      }
+    }
+    return list;
+  }, [daySchedules]);
+
   if (!isOpen) return null;
 
-  // Real-time automatic balance calculation
   const priceNum = Number(totalPrice) || 0;
   const advanceNum = Number(advanceAmount) || 0;
   const remainingBalance = Math.max(0, priceNum - advanceNum);
+
+  const updateDayTime = (date: string, timeIndex: number, value: string) => {
+    setDaySchedules(prev =>
+      prev.map(day =>
+        day.date === date
+          ? { ...day, times: day.times.map((tm, i) => (i === timeIndex ? value : tm)) }
+          : day
+      )
+    );
+  };
+
+  const addDayTime = (date: string) => {
+    setDaySchedules(prev =>
+      prev.map(day => (day.date === date ? { ...day, times: [...day.times, ''] } : day))
+    );
+  };
+
+  const removeDayTime = (date: string, timeIndex: number) => {
+    setDaySchedules(prev =>
+      prev.map(day => {
+        if (day.date !== date) return day;
+        if (day.times.length <= 1) return day;
+        return { ...day, times: day.times.filter((_, i) => i !== timeIndex) };
+      })
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +154,30 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setErrorMsg(lang === 'hi' ? 'कृपया ग्राहक का नाम दर्ज करें' : 'Please enter customer name');
       return;
     }
-    if (!appointmentDate) {
+    if (!dateFrom) {
       setErrorMsg(lang === 'hi' ? 'कृपया बुकिंग की तारीख चुनें' : 'Please select appointment date');
+      return;
+    }
+    if (dateTo && dateTo < dateFrom) {
+      setErrorMsg(lang === 'hi' ? 'अंतिम तारीख शुरू तारीख से पहले नहीं हो सकती' : 'End date cannot be before start date');
       return;
     }
     if (priceNum < 0 || advanceNum < 0) {
       setErrorMsg(lang === 'hi' ? 'रकम 0 या उससे अधिक होनी चाहिए' : 'Amounts cannot be negative');
+      return;
+    }
+    if (slots.length === 0) {
+      setErrorMsg(lang === 'hi' ? 'कम से कम एक तारीख चुनें' : 'Please select at least one date');
+      return;
+    }
+
+    const missingTime = daySchedules.some(day => !day.times.some(tm => tm.trim()));
+    if (missingTime) {
+      setErrorMsg(
+        lang === 'hi'
+          ? 'कृपया हर तारीख के लिए कम से कम एक समय लिखें'
+          : 'Please enter at least one time for each date'
+      );
       return;
     }
 
@@ -97,19 +189,48 @@ export const OrderModal: React.FC<OrderModalProps> = ({
     try {
       setIsSubmitting(true);
       setErrorMsg('');
-      await onSave({
-        customer_name: customerName.trim(),
-        phone_number: phoneNumber.trim() || undefined,
-        service_type: finalService,
-        appointment_date: appointmentDate,
-        appointment_time: appointmentTime.trim() || undefined,
-        total_price: priceNum,
-        advance_amount: advanceNum,
-        remaining_balance: remainingBalance,
-        notes: notes.trim() || undefined,
-        status,
-        is_demo: initialData?.is_demo || false,
-      });
+
+      if (isEditing || slots.length === 1) {
+        const slot = slots[0];
+        await onSave({
+          customer_name: customerName.trim(),
+          phone_number: phoneNumber.trim() || undefined,
+          service_type: finalService,
+          appointment_date: slot.date,
+          appointment_time: slot.time || undefined,
+          total_price: priceNum,
+          advance_amount: advanceNum,
+          remaining_balance: remainingBalance,
+          notes: notes.trim() || undefined,
+          status,
+          is_demo: initialData?.is_demo || false,
+        });
+      } else {
+        const payload = slots.map((slot, index) => {
+          const advance = index === 0 ? advanceNum : 0;
+          return {
+            customer_name: customerName.trim(),
+            phone_number: phoneNumber.trim() || undefined,
+            service_type: finalService,
+            appointment_date: slot.date,
+            appointment_time: slot.time || undefined,
+            total_price: priceNum,
+            advance_amount: advance,
+            remaining_balance: Math.max(0, priceNum - advance),
+            notes: notes.trim() || undefined,
+            status: 'Upcoming' as OrderStatus,
+            is_demo: false,
+          };
+        });
+
+        if (onSaveMany) {
+          await onSaveMany(payload);
+        } else {
+          for (const order of payload) {
+            await onSave(order);
+          }
+        }
+      }
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Save failed';
@@ -136,7 +257,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">
-            {initialData
+            {isEditing
               ? lang === 'hi' ? 'बुकिंग बदलें' : 'Edit Booking'
               : t.addOrder}
           </h3>
@@ -147,7 +268,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {/* Customer Name */}
             <div className="form-group">
               <label className="form-label">{t.customerName} *</label>
               <input
@@ -161,7 +281,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               />
             </div>
 
-            {/* Phone Number */}
             <div className="form-group">
               <label className="form-label">{t.phoneNumber}</label>
               <input
@@ -174,7 +293,6 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               />
             </div>
 
-            {/* Service Type */}
             <div className="form-group">
               <label className="form-label">{t.serviceType} *</label>
               <select
@@ -201,35 +319,159 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               )}
             </div>
 
-            {/* Date & Time Row */}
-            <div className="form-row">
+            {/* Date range */}
+            {isEditing ? (
               <div className="form-group">
                 <label className="form-label">{t.appointmentDate} *</label>
                 <input
                   type="date"
                   required
-                  value={appointmentDate}
-                  onChange={e => setAppointmentDate(e.target.value)}
+                  value={dateFrom}
+                  onChange={e => {
+                    const d = e.target.value;
+                    setDateFrom(d);
+                    setDateTo(d);
+                    setDaySchedules(prev => [
+                      {
+                        date: d,
+                        times: prev[0]?.times?.length ? prev[0].times : ['11:00 AM'],
+                      },
+                    ]);
+                  }}
                   className="form-input"
                 />
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">{t.bookingDates} *</label>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label-sub">{t.dateFrom}</label>
+                    <input
+                      type="date"
+                      required
+                      value={dateFrom}
+                      onChange={e => {
+                        setDateFrom(e.target.value);
+                        if (!dateTo || dateTo < e.target.value) setDateTo(e.target.value);
+                      }}
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label-sub">{t.dateTo}</label>
+                    <input
+                      type="date"
+                      required
+                      value={dateTo}
+                      min={dateFrom}
+                      onChange={e => setDateTo(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+                <p className="form-hint">
+                  {lang === 'hi'
+                    ? 'तारीख चुनने के बाद हर दिन का अलग समय सेट करें।'
+                    : 'After picking dates, set a different time for each day below.'}
+                </p>
+              </div>
+            )}
+
+            {/* Per-date times */}
+            <div className="form-group">
+              <label className="form-label">
+                {isEditing ? t.appointmentTime : t.timePerDate} *
+              </label>
+
+              <div className="day-schedule-list">
+                {daySchedules.map(day => (
+                  <div key={day.date} className="day-schedule-card">
+                    <div className="day-schedule-header">
+                      <span className="day-schedule-date">
+                        {formatReadableDate(day.date, locale)}
+                      </span>
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => addDayTime(day.date)}
+                          className="btn-text-add"
+                        >
+                          <Plus size={15} />
+                          <span>{t.addTimeSlot}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="time-slots-list">
+                      {day.times.map((tm, timeIndex) => (
+                        <div key={`${day.date}-${timeIndex}`} className="time-slot-row">
+                          <input
+                            type="text"
+                            required
+                            placeholder={lang === 'hi' ? 'उदा. 11:00 AM' : 'e.g. 11:00 AM'}
+                            value={tm}
+                            onChange={e => updateDayTime(day.date, timeIndex, e.target.value)}
+                            className="form-input"
+                            aria-label={`Time for ${day.date}`}
+                          />
+                          {!isEditing && day.times.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeDayTime(day.date, timeIndex)}
+                              className="icon-btn-ghost danger"
+                              aria-label="Remove time"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="form-group">
-                <label className="form-label">{t.appointmentTime}</label>
-                <input
-                  type="text"
-                  placeholder="11:00 AM"
-                  value={appointmentTime}
-                  onChange={e => setAppointmentTime(e.target.value)}
-                  className="form-input"
-                />
-              </div>
+              {!isEditing && daySchedules.length > 1 && (
+                <p className="form-hint">
+                  {lang === 'hi'
+                    ? 'एक दिन में 2–3 बार तैयार होना हो तो उस दिन पर “समय जोड़ें” दबाएँ।'
+                    : 'Need 2–3 visits on one day? Use “Add time” on that day only.'}
+                </p>
+              )}
             </div>
 
-            {/* Money Row: Total Price & Advance Paid */}
+            {!isEditing && slots.length > 1 && (
+              <div className="slot-preview">
+                <div className="slot-preview-title">
+                  {t.willCreateBookings.replace('{count}', String(slots.length))}
+                </div>
+                <ul className="slot-preview-list">
+                  {slots.slice(0, 10).map((slot, i) => (
+                    <li key={`${slot.date}-${slot.time}-${i}`}>
+                      {formatReadableDate(slot.date, locale)}
+                      {slot.time ? ` · ${slot.time}` : ''}
+                    </li>
+                  ))}
+                  {slots.length > 10 && (
+                    <li className="slot-preview-more">
+                      +{slots.length - 10} {lang === 'hi' ? 'और' : 'more'}
+                    </li>
+                  )}
+                </ul>
+                {advanceNum > 0 && (
+                  <p className="form-hint" style={{ marginTop: 8 }}>
+                    {t.advanceOnFirstOnly}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">{t.totalPrice} *</label>
+                <label className="form-label">
+                  {!isEditing && slots.length > 1 ? t.pricePerVisit : t.totalPrice} *
+                </label>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -239,8 +481,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                   placeholder="₹ 0"
                   value={totalPrice}
                   onChange={e => setTotalPrice(e.target.value)}
-                  className="form-input"
-                  style={{ fontWeight: 700 }}
+                  className="form-input amount-input"
                 />
               </div>
 
@@ -254,62 +495,34 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                   placeholder="₹ 0"
                   value={advanceAmount}
                   onChange={e => setAdvanceAmount(e.target.value)}
-                  className="form-input"
-                  style={{ fontWeight: 700 }}
+                  className="form-input amount-input"
                 />
               </div>
             </div>
 
-            {/* Real-time Calculated Balance Card */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                background: remainingBalance > 0 ? '#FFF7ED' : '#ECFDF5',
-                border: `1.5px solid ${remainingBalance > 0 ? '#FDBA74' : '#A7F3D0'}`,
-              }}
-            >
+            <div className={`balance-summary ${remainingBalance > 0 ? 'due' : 'paid'}`}>
               <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                <div className="balance-summary-label">
                   {remainingBalance > 0 ? t.balanceDue : t.fullyPaid}
+                  {!isEditing && slots.length > 1
+                    ? ` (${lang === 'hi' ? 'प्रति विज़िट' : 'per visit'})`
+                    : ''}
                 </div>
-                <div
-                  style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    color: remainingBalance > 0 ? '#C2410C' : '#047857',
-                  }}
-                >
+                <div className="balance-summary-value">
                   ₹ {remainingBalance.toLocaleString('en-IN')}
                 </div>
               </div>
               {advanceNum > 0 && (
-                <div
-                  style={{
-                    fontSize: '0.82rem',
-                    color: '#065F46',
-                    background: '#D1FAE5',
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
+                <div className="advance-chip">
                   <CheckCircle2 size={14} />
                   <span>
-                    ₹{advanceNum.toLocaleString('en-IN')} {lang === 'hi' ? 'एडवांस जमा' : 'Advance Paid'}
+                    ₹{advanceNum.toLocaleString('en-IN')} {lang === 'hi' ? 'एडवांस' : 'Advance'}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Status (if editing) */}
-            {initialData && (
+            {isEditing && (
               <div className="form-group">
                 <label className="form-label">{t.status}</label>
                 <select
@@ -324,39 +537,24 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               </div>
             )}
 
-            {/* Optional Notes */}
             <div className="form-group">
               <label className="form-label">{t.notes}</label>
               <textarea
                 rows={2}
-                placeholder={lang === 'hi' ? 'उदा. ब्राइडल लहंगा लाल रंग का है, घर पर जाना है...' : 'e.g. Venue address, jewelry setting details...'}
+                placeholder={
+                  lang === 'hi'
+                    ? 'उदा. ब्राइडल लहंगा लाल रंग का है, घर पर जाना है...'
+                    : 'e.g. Venue address, jewelry setting details...'
+                }
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 className="form-textarea"
               />
             </div>
 
-            {errorMsg && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: '#FEE2E2',
-                  border: '1px solid #FCA5A5',
-                  color: '#DC2626',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                }}
-              >
-                {errorMsg}
-              </div>
-            )}
+            {errorMsg && <div className="form-error">{errorMsg}</div>}
 
-            {/* Calm guidance notice */}
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', gap: '6px' }}>
-              <Sparkles size={16} color="var(--rose-primary)" style={{ flexShrink: 0 }} />
-              <span>{t.incomeRuleNote}</span>
-            </div>
+            <p className="form-hint">{t.incomeRuleNote}</p>
           </div>
 
           <div className="modal-footer">
@@ -364,7 +562,11 @@ export const OrderModal: React.FC<OrderModalProps> = ({
               {t.cancel}
             </button>
             <button type="submit" disabled={isSubmitting} className="btn-primary-modal">
-              {isSubmitting ? t.saving : t.save}
+              {isSubmitting
+                ? t.saving
+                : !isEditing && slots.length > 1
+                ? t.saveBookings.replace('{count}', String(slots.length))
+                : t.save}
             </button>
           </div>
         </form>
