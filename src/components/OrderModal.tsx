@@ -4,7 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Order, OrderStatus } from '@/lib/types';
 import { Language, translations, INCOME_CATEGORIES } from '@/lib/translations';
-import { eachDateInRange, formatReadableDate, localToday } from '@/lib/dates';
+import { eachDateInRange, formatReadableDate, localToday, toDisplayTime12, DEFAULT_TIME_12 } from '@/lib/dates';
+import { TimePicker12 } from '@/components/TimePicker12';
+
+const DEFAULT_TIME = DEFAULT_TIME_12;
 
 interface DaySchedule {
   date: string;
@@ -20,7 +23,7 @@ interface OrderModalProps {
   lang: Language;
 }
 
-function syncSchedules(prev: DaySchedule[], dates: string[], defaultTime = '11:00 AM'): DaySchedule[] {
+function syncSchedules(prev: DaySchedule[], dates: string[], defaultTime = DEFAULT_TIME): DaySchedule[] {
   const map = new Map(prev.map(d => [d.date, d.times]));
   return dates.map(date => ({
     date,
@@ -70,7 +73,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setDaySchedules([
         {
           date: initialData.appointment_date,
-          times: [initialData.appointment_time || '11:00 AM'],
+          times: [toDisplayTime12(initialData.appointment_time || '')],
         },
       ]);
       setTotalPrice(String(initialData.total_price));
@@ -85,7 +88,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
       setCustomService('');
       setDateFrom(today);
       setDateTo(today);
-      setDaySchedules([{ date: today, times: ['11:00 AM'] }]);
+      setDaySchedules([{ date: today, times: [DEFAULT_TIME] }]);
       setTotalPrice('');
       setAdvanceAmount('0');
       setNotes('');
@@ -134,7 +137,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
   const addDayTime = (date: string) => {
     setDaySchedules(prev =>
-      prev.map(day => (day.date === date ? { ...day, times: [...day.times, ''] } : day))
+      prev.map(day => (day.date === date ? { ...day, times: [...day.times, DEFAULT_TIME] } : day))
     );
   };
 
@@ -334,7 +337,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     setDaySchedules(prev => [
                       {
                         date: d,
-                        times: prev[0]?.times?.length ? prev[0].times : ['11:00 AM'],
+                        times: prev[0]?.times?.length ? prev[0].times : [DEFAULT_TIME],
                       },
                     ]);
                   }}
@@ -406,13 +409,10 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     <div className="time-slots-list">
                       {day.times.map((tm, timeIndex) => (
                         <div key={`${day.date}-${timeIndex}`} className="time-slot-row">
-                          <input
-                            type="text"
+                          <TimePicker12
                             required
-                            placeholder={lang === 'hi' ? 'उदा. 11:00 AM' : 'e.g. 11:00 AM'}
                             value={tm}
-                            onChange={e => updateDayTime(day.date, timeIndex, e.target.value)}
-                            className="form-input"
+                            onChange={value => updateDayTime(day.date, timeIndex, value)}
                             aria-label={`Time for ${day.date}`}
                           />
                           {!isEditing && day.times.length > 1 && (

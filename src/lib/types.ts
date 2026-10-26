@@ -21,7 +21,7 @@ export interface Order {
   phone_number?: string;
   service_type: string;
   appointment_date: string; // YYYY-MM-DD
-  appointment_time?: string; // e.g., "11:00 AM" or "15:30"
+  appointment_time?: string; // e.g. "11:00 AM"
   total_price: number;
   advance_amount: number;
   remaining_balance: number;

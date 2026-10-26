@@ -50,6 +50,54 @@ export function formatReadableDate(dateStr: string, locale: string): string {
   }
 }
 
+export type AmPm = 'AM' | 'PM';
+
+export interface Time12 {
+  hour: number; // 1–12
+  minute: number; // 0–59
+  period: AmPm;
+}
+
+export const DEFAULT_TIME_12 = '11:00 AM';
+
+/** Parse free-form times ("11:00 AM", "3:30pm", "15:30") into 12-hour parts. */
+export function parseTime12(time: string): Time12 | null {
+  const raw = time.trim();
+  if (!raw) return null;
+
+  const ampm = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let hour = Number(ampm[1]);
+    const minute = Math.min(59, Number(ampm[2]));
+    const period = ampm[3].toUpperCase() as AmPm;
+    if (hour < 1 || hour > 12) hour = ((hour - 1 + 12) % 12) + 1;
+    return { hour, minute, period };
+  }
+
+  const h24 = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (h24) {
+    const h = Math.min(23, Number(h24[1]));
+    const minute = Math.min(59, Number(h24[2]));
+    const period: AmPm = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 === 0 ? 12 : h % 12;
+    return { hour, minute, period };
+  }
+
+  return null;
+}
+
+export function formatTime12(parts: Time12): string {
+  const hour = Math.min(12, Math.max(1, parts.hour));
+  const minute = Math.min(59, Math.max(0, parts.minute));
+  return `${hour}:${String(minute).padStart(2, '0')} ${parts.period}`;
+}
+
+/** Normalize any stored time to "h:mm AM/PM"; falls back to default. */
+export function toDisplayTime12(time: string, fallback = DEFAULT_TIME_12): string {
+  const parsed = parseTime12(time);
+  return parsed ? formatTime12(parsed) : fallback;
+}
+
 export function isToday(dateStr: string, today = localToday()): boolean {
   return dateStr === today;
 }
